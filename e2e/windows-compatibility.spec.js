@@ -37,6 +37,13 @@ async function openPastedDocument(page) {
   await expect(page.getByTestId('tree-ready')).toBeAttached();
 }
 
+async function toolValues(page) {
+  return page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    return (await initMonaco()).editor.getEditors().map(editor => editor.getValue());
+  });
+}
+
 for (const platform of [
   { name: 'Windows', navigator: 'Win32', ua: 'Windows NT 10.0; Win64; x64', eol: '\r\n' },
   { name: 'macOS', navigator: 'MacIntel', ua: 'Macintosh; Intel Mac OS X 10_15_7', eol: '\n' },
@@ -123,6 +130,93 @@ for (const platform of [
       }).toBe(true);
       await page.getByRole('button', { name: 'Minify', exact: true }).click();
       await expect.poll(async () => (await editorState(page)).value).toBe(SOURCE);
+    });
+
+    test('Diff paste and toolbar operations stay on the active pane', async ({ page }) => {
+      await installTauriEditorHarness(page);
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Diff', exact: true }).click();
+      const original = page.locator('.monaco-diff-editor .editor.original .view-lines');
+      await expect(original).toBeVisible();
+      await original.click();
+      await pasteIntoEditor(page, SOURCE);
+      await expect.poll(async () => (await toolValues(page))[0].includes('\n')).toBe(true);
+      await page.getByRole('button', { name: 'Minify', exact: true }).click();
+      await expect.poll(async () => (await toolValues(page))[0]).toBe(SOURCE);
+      expect((await toolValues(page))[1]).toBe('');
+    });
+
+    test('Convert accepts CRLF INI and lets the JSON output be minified', async ({ page }) => {
+      await installTauriEditorHarness(page);
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Convert', exact: true }).click();
+      await page.locator('.cv-custom-select').click();
+      await page.getByRole('button', { name: 'INI', exact: true }).click();
+      await page.locator('.cv-divider').getByRole('button', { name: 'Toggle conversion direction' }).click();
+      await page.locator('.cv-pane').first().locator('.view-lines').click();
+      await page.keyboard.insertText('[server]\r\nhost=localhost\r\nport=8080\r\n');
+      const result = { server: { host: 'localhost', port: 8080 } };
+      await expect.poll(async () => {
+        const output = (await toolValues(page))[1];
+        return output ? JSON.parse(output) : null;
+      }).toEqual(result);
+      await page.getByRole('button', { name: 'Minify', exact: true }).click();
+      await expect.poll(async () => (await toolValues(page))[1]).toBe(JSON.stringify(result));
+    });
+
+    test('Codegen handles CRLF JSON input', async ({ page }) => {
+      await installTauriEditorHarness(page);
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Codegen', exact: true }).click();
+      await page.locator('.cg-pane').first().locator('.view-lines').click();
+      await page.keyboard.insertText(JSON.stringify(DOCUMENT, null, 2).replaceAll('\n', '\r\n'));
+      await expect.poll(async () => (await toolValues(page))[1]).toContain('export interface MyModel');
+      expect((await toolValues(page))[1]).toContain('profile:');
+    });
+
+    test('Schema generates and formats JSON containing CRLF', async ({ page }) => {
+      await openPastedDocument(page);
+      await page.getByRole('button', { name: 'Schema', exact: true }).click();
+      await expect.poll(async () => {
+        const output = (await toolValues(page))[1];
+        return output ? JSON.parse(output).properties?.profile?.type : null;
+      }).toBe('object');
+      await page.getByRole('button', { name: 'Minify', exact: true }).click();
+      await expect.poll(async () => (await toolValues(page))[0]).toBe(SOURCE);
+      await page.getByRole('button', { name: 'Prettify', exact: true }).click();
+      await expect.poll(async () => (await toolValues(page))[0].includes('\n')).toBe(true);
+    });
+
+    test('JSONL reads BOM and CRLF records without reformatting the source', async ({ page }) => {
+      const source = '\uFEFF{"id":1,"name":"Alice"}\r\n{"id":2,"name":"Bob"}\r\n';
+      await installTauriEditorHarness(page, source, {
+        fileName: 'events.jsonl',
+        filePath: platform.name === 'Windows' ? 'C:\\Data\\events.jsonl' : '/tmp/events.jsonl',
+      });
+      await page.goto('/');
+      const view = page.getByTestId('jsonl-view');
+      await expect(view.locator('.jsonl-item')).toHaveCount(2);
+      await expect(page.getByTestId('editor-jsonl-record-count')).toContainText('2 records');
+      await view.getByRole('button', { name: 'View source' }).click();
+      await expect(page.getByTestId('json-editor')).toBeVisible();
+      expect(JSON.parse((await editorState(page)).value.split('\r\n')[0])).toEqual({ id: 1, name: 'Alice' });
+      await expect(page.getByRole('button', { name: 'Minify', exact: true })).toBeDisabled();
+    });
+
+    test('caption buttons invoke window commands without starting a drag', async ({ page }) => {
+      await installTauriEditorHarness(page, '', {
+        isTauri: true,
+        desktopPlatform: 'windows',
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Minimize', exact: true }).click();
+      await page.getByRole('button', { name: 'Maximize', exact: true }).click();
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+      const commands = await page.evaluate(() => window.__JSON_STUDIO_WINDOW_COMMANDS__);
+      expect(commands).toContain('plugin:window|minimize');
+      expect(commands).toContain('plugin:window|toggle_maximize');
+      expect(commands).toContain('plugin:window|close');
+      expect(commands).not.toContain('plugin:window|start_dragging');
     });
   });
 }

@@ -240,6 +240,7 @@ fn tokenize_json(content: &str, colors: &ExportColors, bracket_colors: &[String]
     let mut all_lines = Vec::new();
 
     for line in content.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
         let mut tokens = Vec::new();
         let chars: Vec<char> = line.chars().collect();
         let mut i = 0;
@@ -561,4 +562,34 @@ fn generate_image(request: ExportRequest) -> Result<String, String> {
     }
 
     Ok(base64::engine::general_purpose::STANDARD.encode(&png_buf))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{generate_image, ExportColors, ExportRequest};
+
+    #[test]
+    fn exports_identical_images_for_lf_and_crlf_documents() {
+        let source = format!("{{\n  \"message\": \"{}\"\n}}\n", "x".repeat(70));
+        let request = |content: String| ExportRequest {
+            content,
+            colors: ExportColors {
+                background: "#ffffff".into(),
+                foreground: "#202020".into(),
+                key_color: "#008080".into(),
+                string_color: "#208020".into(),
+                number_color: "#804020".into(),
+                boolean_color: "#204080".into(),
+                null_color: "#808080".into(),
+                delimiter_color: "#202020".into(),
+            },
+            bracket_colors: vec![],
+            is_dark: false,
+            font_size: Some(14.0),
+            line_height: Some(22.0),
+        };
+        let lf = generate_image(request(source.clone())).unwrap();
+        let crlf = generate_image(request(source.replace('\n', "\r\n"))).unwrap();
+        assert!(lf == crlf, "CRLF must not add visible characters or change image layout");
+    }
 }

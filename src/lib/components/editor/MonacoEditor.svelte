@@ -477,11 +477,13 @@
     if (model) {
       // Use pushEditOperations to preserve undo history
       const fullRange = model.getFullModelRange();
+      model.pushStackElement();
       model.pushEditOperations(
         [],
         [{ range: fullRange, text: newValue }],
         () => null
       );
+      model.pushStackElement();
     }
   }
 
@@ -492,6 +494,7 @@
 
     const startPosition = model.getPositionAt(start);
     const endPosition = model.getPositionAt(end);
+    model.pushStackElement();
     model.pushEditOperations(
       [],
       [{
@@ -505,6 +508,7 @@
       }],
       () => null,
     );
+    model.pushStackElement();
   }
 
   export function getValue(): string {

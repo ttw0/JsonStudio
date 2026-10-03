@@ -236,7 +236,9 @@
   export function setValue(value: string) {
     const model = leftEditor?.getModel();
     if (!model) return;
+    model.pushStackElement();
     model.pushEditOperations([], [{ range: model.getFullModelRange(), text: value }], () => null);
+    model.pushStackElement();
   }
 
   export function minify(): string {

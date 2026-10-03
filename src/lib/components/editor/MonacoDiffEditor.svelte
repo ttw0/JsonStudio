@@ -76,11 +76,13 @@
   export function setValue(value: string) {
     const model = getActiveEditor()?.getModel();
     if (!model) return;
+    model.pushStackElement();
     model.pushEditOperations(
       [],
       [{ range: model.getFullModelRange(), text: value }],
       () => null,
     );
+    model.pushStackElement();
   }
 
   export function minify(): string {

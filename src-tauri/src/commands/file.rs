@@ -267,3 +267,36 @@ pub fn show_in_folder(app: AppHandle, path: String) -> Result<(), String> {
         .reveal_item_in_dir(&path)
         .map_err(|e| format!("Failed to reveal in folder: {}", e))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{read_file, read_text_file};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn reads_bom_files_from_paths_containing_spaces_and_unicode() {
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("jsonstudio-encoding-{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("\u{4e2d}\u{6587} data.json");
+        let content = "{\r\n  \"name\": \"\u{4e2d}\u{6587}\u{1f600}\"\r\n}";
+        let utf8 = [b"\xef\xbb\xbf".as_slice(), content.as_bytes()].concat();
+        let mut utf16 = vec![0xff, 0xfe];
+        for unit in content.encode_utf16() {
+            utf16.extend_from_slice(&unit.to_le_bytes());
+        }
+
+        for bytes in [utf8, utf16] {
+            std::fs::write(&path, bytes).unwrap();
+            assert_eq!(
+                tauri::async_runtime::block_on(read_text_file(&path)).unwrap(),
+                content,
+            );
+            assert_eq!(
+                tauri::async_runtime::block_on(read_file(path.to_string_lossy().into_owned())).unwrap(),
+                content,
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}

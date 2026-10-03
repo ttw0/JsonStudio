@@ -15,12 +15,12 @@ function emptyStats() {
 }
 
 export async function installTauriEditorHarness(page, content = '', options = {}) {
-  await page.addInitScript(({ tabStateKey, settingsKey, initialContent, stats, showTreeView, isTauri }) => {
+  await page.addInitScript(({ tabStateKey, settingsKey, initialContent, stats, showTreeView, isTauri, desktopPlatform, fileName, filePath }) => {
     localStorage.setItem(tabStateKey, JSON.stringify({
       tabs: [{
         id: 'editor-test-tab',
-        filePath: null,
-        fileName: 'Editor Test',
+        filePath,
+        fileName,
         content: initialContent,
         isModified: false,
         stats,
@@ -39,6 +39,7 @@ export async function installTauriEditorHarness(page, content = '', options = {}
 
     window.isTauri = isTauri;
     window.__JSON_STUDIO_OPENED_URLS__ = [];
+    window.__JSON_STUDIO_WINDOW_COMMANDS__ = [];
 
     let callbackId = 0;
     const callbacks = new Map();
@@ -65,6 +66,12 @@ export async function installTauriEditorHarness(page, content = '', options = {}
         return path;
       },
       async invoke(command, args) {
+        if (command === 'desktop_platform') return desktopPlatform;
+        if (command.startsWith('plugin:window|')) {
+          window.__JSON_STUDIO_WINDOW_COMMANDS__.push(command);
+          if (command === 'plugin:window|is_focused') return true;
+          if (command === 'plugin:window|is_fullscreen' || command === 'plugin:window|is_maximized') return false;
+        }
         if (command === 'get_pending_files') return [];
         if (command === 'plugin:event|listen') return ++callbackId;
         if (command === 'plugin:opener|open_url') {
@@ -84,6 +91,9 @@ export async function installTauriEditorHarness(page, content = '', options = {}
     stats: emptyStats(),
     showTreeView: options.showTreeView ?? false,
     isTauri: options.isTauri ?? false,
+    desktopPlatform: options.desktopPlatform ?? 'macos',
+    fileName: options.fileName ?? 'Editor Test',
+    filePath: options.filePath ?? null,
   });
 }
 

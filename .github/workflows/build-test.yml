@@ -60,6 +60,21 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test frontend
+        run: pnpm test
+
+      - name: Check frontend types
+        run: pnpm check
+
+      - name: Install Chromium for compatibility tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test desktop platform compatibility
+        run: pnpm exec playwright test e2e/windows-compatibility.spec.js
+
+      - name: Test Rust backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
       - name: Build frontend
         run: pnpm build
 

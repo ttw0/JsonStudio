@@ -474,6 +474,29 @@ mod tests {
     use serde_json::Value;
 
     #[test]
+    fn structured_formats_round_trip_with_windows_line_endings() {
+        let source = "{\r\n  \"name\": \"Alice\",\r\n  \"active\": true\r\n}";
+        let expected: Value = serde_json::from_str(source).unwrap();
+        type Convert = fn(&str) -> Result<String, String>;
+        let formats: [(Convert, Convert); 3] = [
+            (super::json_to_yaml, super::yaml_to_json),
+            (super::json_to_toml, super::toml_to_json),
+            (super::json_to_xml, super::xml_to_json),
+        ];
+        for (encode, decode) in formats {
+            let encoded = encode(source).unwrap().replace("\r\n", "\n").replace('\n', "\r\n");
+            let decoded = decode(&encoded).unwrap();
+            assert_eq!(serde_json::from_str::<Value>(&decoded).unwrap(), expected);
+        }
+        let csv = super::json_to_csv("[{\"name\":\"Alice\",\"active\":true}]").unwrap();
+        let crlf = csv.replace("\r\n", "\n").replace('\n', "\r\n");
+        assert_eq!(
+            serde_json::from_str::<Value>(&super::csv_to_json(&crlf).unwrap()).unwrap(),
+            serde_json::json!([{"name":"Alice","active":true}]),
+        );
+    }
+
+    #[test]
     fn xml_round_trip_preserves_root_shapes() {
         let samples = [
             r#"{}"#,
