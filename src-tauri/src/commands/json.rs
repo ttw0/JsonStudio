@@ -200,4 +200,41 @@ mod tests {
         assert!(formatted.find(r#""z""#).unwrap() < formatted.find(r#""a""#).unwrap());
         assert!(formatted.find(r#""y""#).unwrap() < formatted.find(r#""b""#).unwrap());
     }
+
+    #[test]
+    fn json_format_preserves_large_integers() {
+        // Test that arbitrary_precision feature preserves large integers beyond f64 precision
+        let input = r#"{"age": 12345678901234567890}"#;
+
+        let formatted = json_format(input, Some(2)).unwrap();
+
+        // Should preserve the exact number (not lose precision)
+        assert!(formatted.contains("12345678901234567890"),
+                "Expected to preserve large integer, got: {}", formatted);
+    }
+
+    #[test]
+    fn json_format_preserves_multiple_large_integers() {
+        let input = r#"{"small":123,"large1":12345678901234567890,"large2":98765432109876543210,"safe":9007199254740991}"#;
+
+        let formatted = json_format(input, Some(2)).unwrap();
+
+        // All numbers should be preserved
+        assert!(formatted.contains("123"));
+        assert!(formatted.contains("12345678901234567890"));
+        assert!(formatted.contains("98765432109876543210"));
+        assert!(formatted.contains("9007199254740991"));
+    }
+
+    #[test]
+    fn json_format_preserves_edge_case_integers() {
+        // Test edge cases: Number.MAX_SAFE_INTEGER and beyond
+        let input = r#"{"maxSafe":9007199254740991,"beyondSafe":9007199254740992,"huge":123456789012345678901234567890}"#;
+
+        let formatted = json_format(input, Some(2)).unwrap();
+
+        assert!(formatted.contains("9007199254740991"));  // MAX_SAFE_INTEGER
+        assert!(formatted.contains("9007199254740992"));  // MAX_SAFE_INTEGER + 1
+        assert!(formatted.contains("123456789012345678901234567890"));  // Way beyond
+    }
 }
