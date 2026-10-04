@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import type * as Monaco from 'monaco-editor';
+  import { ArrowLeft } from '@lucide/svelte';
   import { initMonaco } from '$lib/services/monaco';
   import { unescapeString } from '$lib/services/json';
   import { formatJsonText } from '$lib/services/json5Format.js';
@@ -11,6 +12,14 @@
   import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   type DiffSide = 'original' | 'modified';
+  const paneEditorOptions: Monaco.editor.IEditorOptions = {
+    glyphMargin: false,
+    lineDecorationsWidth: 16,
+    lineNumbersMinChars: 3,
+    folding: true,
+    showFoldingControls: 'always',
+    foldingStrategy: 'auto',
+  };
 
   let {
     originalValue = '',
@@ -55,6 +64,7 @@
   let modifiedPasteTimer: ReturnType<typeof setTimeout> | null = null;
   let activeSide = $state<DiffSide>('original');
   let originalPaneWidth = $state<number | null>(null);
+  const paneFoldingDisposables: Monaco.IDisposable[] = [];
   let destroyed = false;
 
   function setActiveSide(side: DiffSide) {
@@ -144,14 +154,19 @@
   });
 
   $effect(() => {
-    if (diffEditor) {
-      diffEditor.updateOptions({
-        readOnly,
-        originalEditable: !readOnly,
-        fontSize,
-        lineHeight,
-      });
-    }
+    const instance = diffEditor;
+    const options = {
+      readOnly,
+      originalEditable: !readOnly,
+      fontSize,
+      lineHeight,
+    };
+    // Monaco callbacks must not add focus/active-side state to this effect's dependencies.
+    if (instance) untrack(() => {
+      const viewState = instance.saveViewState();
+      instance.updateOptions(options);
+      if (viewState) instance.restoreViewState(viewState);
+    });
   });
 
   $effect(() => {
@@ -185,6 +200,7 @@
     });
 
     const createdDiffEditor = monacoInstance.editor.createDiffEditor(container, {
+      ...paneEditorOptions,
       theme,
       automaticLayout: true,
       readOnly,
@@ -200,9 +216,6 @@
       fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace",
       contextmenu: false,
       renderIndicators: false,
-      lineNumbersMinChars: 3,
-      glyphMargin: false,
-      lineDecorationsWidth: 0,
     });
 
     diffEditor = createdDiffEditor;
@@ -212,18 +225,20 @@
     modifiedModel = createdModifiedModel;
     createdDiffEditor.setModel({ original: createdOriginalModel, modified: createdModifiedModel });
 
-    const editorOptions: Monaco.editor.IEditorOptions = {
-      glyphMargin: false,
-      lineDecorationsWidth: 0,
-      lineNumbersMinChars: 3,
-      folding: true,
-      showFoldingControls: 'always',
-      foldingStrategy: 'indentation',
-    };
     const originalEditor = createdDiffEditor.getOriginalEditor();
     const modifiedEditor = createdDiffEditor.getModifiedEditor();
-    originalEditor.updateOptions(editorOptions);
-    modifiedEditor.updateOptions(editorOptions);
+    for (const pane of [originalEditor, modifiedEditor]) {
+      // Monaco disables pane folding whenever Diff options or layout modes change.
+      paneFoldingDisposables.push(pane.onDidChangeConfiguration(event => {
+        if (
+          event.hasChanged(monacoInstance.editor.EditorOption.folding) &&
+          !pane.getOption(monacoInstance.editor.EditorOption.folding)
+        ) {
+          pane.updateOptions(paneEditorOptions);
+        }
+      }));
+      pane.updateOptions(paneEditorOptions);
+    }
     originalEditor.onMouseDown(() => setActiveSide('original'));
     modifiedEditor.onMouseDown(() => setActiveSide('modified'));
     originalEditor.onDidFocusEditorText(() => setActiveSide('original'));
@@ -262,6 +277,7 @@
     destroyed = true;
     if (originalPasteTimer) clearTimeout(originalPasteTimer);
     if (modifiedPasteTimer) clearTimeout(modifiedPasteTimer);
+    for (const disposable of paneFoldingDisposables) disposable.dispose();
     diffEditor?.dispose();
     originalModel?.dispose();
     modifiedModel?.dispose();
@@ -318,10 +334,7 @@
           aria-label={$t('toolbar.exitDiff')}
           title={$t('toolbar.exitDiff')}
         >
-          <svg class="diff-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 12H5"/>
-            <path d="M12 19l-7-7 7-7"/>
-          </svg>
+          <ArrowLeft size={16} aria-hidden="true" />
         </button>
         <span class="diff-pane-badge">JSON A</span>
       </div>
@@ -394,11 +407,6 @@
     color: var(--accent);
   }
 
-  .diff-back-icon {
-    width: 16px;
-    height: 16px;
-  }
-
   .diff-pane-badge {
     flex-shrink: 0;
     padding: 4px 8px;
@@ -430,8 +438,4 @@
     min-height: 0;
   }
 
-  .diff-editor-container :global(.margin > .toolbar) {
-    display: none !important;
-    width: 0 !important;
-  }
 </style>
