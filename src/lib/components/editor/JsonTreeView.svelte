@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stringifyBigInt } from '$lib/utils/jsonBigInt.js';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import { t } from '$lib/i18n';
   import { createGridValueEdit, isGridEditCommitKey } from '$lib/services/gridEdit.js';
@@ -160,6 +161,10 @@
   // Build tree when the active document changes.
   $effect(() => {
     if (content !== previousContent || tabId !== previousTabId) {
+      if (tabId !== previousTabId) {
+        pendingMovedPath = null;
+        pendingEditKeyPath = null;
+      }
       previousContent = content;
       previousTabId = tabId;
       treeEdit = null;
@@ -283,6 +288,7 @@
     version: number,
     sourceTabId: string,
   ) {
+    const movedPath = pendingMovedPath;
     const preserveViewState = renderedTabId === sourceTabId;
     const preservedScrollTop = treeContentElement?.scrollTop ?? treeScrollTop;
     const wasAllExpanded = isAllExpanded;
@@ -340,7 +346,15 @@
     }
     isLoading = false;
     completedTreeBuildVersion = version;
-    void tick().then(syncTreeSelectionFromEditor);
+    void tick().then(() => {
+      if (version !== treeBuildVersion || tabId !== sourceTabId) return;
+      if (movedPath) {
+        const node = treeNodeByPath.get(movedPath);
+        if (node && !treeEdit) selectNode(node);
+      } else {
+        syncTreeSelectionFromEditor();
+      }
+    });
   }
 
   function createTreeKeyEditState(path: string): TreeEditState | null {
@@ -602,7 +616,7 @@
   }
 
   function syncTreeSelectionFromEditorPosition(position: EditorPosition) {
-    if (treeEdit || isPointerDragging || treeNodes.length === 0) return;
+    if (treeEdit || isPointerDragging || pendingMovedPath || treeNodes.length === 0) return;
 
     const editorInstance = editor?.getEditorInstance();
     const model = editorInstance?.getModel();
@@ -805,7 +819,8 @@
     pendingEditKeyPath = result.editKey ? result.movedPath : null;
     selectedPath = result.movedPath;
     expandedNodes = new Set([...expandedNodes, ...getAncestorPaths(result.movedPath)]);
-    editor?.setValue(JSON.stringify(result.data, null, 2));
+    const content = stringifyBigInt(result.data, null, 2);
+    editor?.setValue(content);
     dispatch('toast', { message: $t('treeView.dragMoved') });
   }
 

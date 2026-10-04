@@ -5,6 +5,12 @@ import {
   parseJsonl,
 } from '../src/lib/services/jsonlParser.js';
 
+test('large integer JSONL values retain numeric shape and exact digits', () => {
+  const result = parseJsonl('123456789012345678901234567890\n');
+  assert.equal(result.rows[0].shape, 'number');
+  assert.equal(result.rows[0].value, 123456789012345678901234567890n);
+});
+
 test('parses JSONL records while preserving physical source line numbers', () => {
   const result = parseJsonl([
     '{"id":1,"name":"Alice"}',

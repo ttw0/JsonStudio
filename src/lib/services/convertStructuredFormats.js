@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { parseBigInt, parseNumericLiteral } from '../utils/jsonBigInt.js';
 
 export function parseConvertStructuredFormat(kind, value) {
   const parser = ({
@@ -71,7 +72,7 @@ function inferScalar(value) {
     const quoted = raw.slice(1, -1);
     if (quote === '"') {
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = parseBigInt(raw);
         if (typeof parsed === 'string') return parsed;
       } catch {
         // Fall through to the unescaped inner text for non-JSON quoted values.
@@ -83,7 +84,7 @@ function inferScalar(value) {
   }
   if (/^(?:null|nil|~|N\/A)$/i.test(raw) || raw === '') return null;
   if (/^(?:true|false)$/i.test(raw)) return raw.toLowerCase() === 'true';
-  if (/^-?\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
+  if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(raw)) return parseNumericLiteral(raw);
   return raw;
 }
 

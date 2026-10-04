@@ -1,3 +1,5 @@
+import { parseBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * @typedef {{
  *   format: (value: string) => Promise<string>;
@@ -53,7 +55,7 @@ async function tryFormat(value, options) {
  */
 function parseJsonString(value) {
   try {
-    const parsed = JSON.parse(value);
+    const parsed = parseBigInt(value);
     return typeof parsed === 'string' ? parsed : null;
   } catch {
     return null;
@@ -70,7 +72,7 @@ async function tryUnescape(value, options) {
   } catch {
     try {
       const escapedLineBreaks = value.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
-      const parsed = JSON.parse(`"${escapedLineBreaks}"`);
+      const parsed = parseBigInt(`"${escapedLineBreaks}"`);
       return typeof parsed === 'string' ? parsed : null;
     } catch {
       return null;

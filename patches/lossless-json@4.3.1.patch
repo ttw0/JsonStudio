@@ -1,0 +1,13 @@
+diff --git a/lib/esm/parse.js b/lib/esm/parse.js
+index 23a380a1f7304f95c34f9c1e822f2db82c70d2cc..9f9d36ffa62d1758ce8669adfbf1fe7736ced421 100644
+--- a/lib/esm/parse.js
++++ b/lib/esm/parse.js
+@@ -37,7 +37,7 @@ export function parse(text, reviver, options) {
+     if (text.charCodeAt(i) === codeOpeningBrace) {
+       i++;
+       skipWhitespace();
+-      const object = {};
++      const object = Object.create(null);
+       let initial = true;
+       while (i < text.length && text.charCodeAt(i) !== codeClosingBrace) {
+         if (!initial) {

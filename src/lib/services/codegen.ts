@@ -5,6 +5,7 @@ import {
   InputData,
   jsonInputForTargetLanguage,
 } from 'quicktype-core';
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
 
 type QuicktypeLanguageName = Extract<Parameters<typeof getTargetLanguage>[0], string>;
 
@@ -42,16 +43,14 @@ export const CODEGEN_LANGUAGES: LangConfig[] = [
 ];
 
 const BACKEND_ONLY_LANGUAGES = new Set<CodegenLanguage>(['protobuf', 'thrift']);
+const ARBITRARY_INTEGER_LANGUAGES = new Set<CodegenLanguage>(['python', 'ruby']);
+const FLOAT_ONLY_LANGUAGES = new Set<CodegenLanguage>(['typescript', 'javascript']);
+const MAX_I64 = 9223372036854775807n;
+const MIN_I64 = -9223372036854775808n;
 
 const ROOT_ARRAY_MARKER = 'jsonstudio:root-array';
 
-function markRootArray(content: string, language: CodegenLanguage, generated: string): string {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content) as unknown;
-  } catch (_) {
-    return generated;
-  }
+function markRootArray(parsed: unknown, language: CodegenLanguage, generated: string): string {
   if (!Array.isArray(parsed)) return generated;
 
   const comment = language === 'python' || language === 'ruby'
@@ -122,10 +121,10 @@ function phpCompatibilitySample(value: unknown): { value: unknown; changed: bool
 
 function phpInputSamples(content: string): string[] {
   try {
-    const parsed = JSON.parse(content) as unknown;
+    const parsed = parseBigInt(content) as unknown;
     const compatibility = phpCompatibilitySample(parsed);
     if (!compatibility.changed) return [content];
-    return [content, JSON.stringify(compatibility.value)];
+    return [content, stringifyBigInt(compatibility.value)];
   } catch (_) {
     return [content];
   }
@@ -137,6 +136,7 @@ async function quicktypeCode(
   qtLang: QuicktypeLanguageName,
   samples: string[],
   rendererOptions: Record<string, string>,
+  preserveIntegerTypes = false,
 ): Promise<string> {
   const jsonInput = jsonInputForCodegenLanguage(qtLang);
   await jsonInput.addSource({ name: className, samples });
@@ -149,6 +149,7 @@ async function quicktypeCode(
       inputData,
       lang: qtLang,
       rendererOptions,
+      ...(preserveIntegerTypes ? { combineClasses: false, inferMaps: false } : {}),
     });
     return result.lines.join('\n');
   } catch (error) {
@@ -156,7 +157,7 @@ async function quicktypeCode(
 
     // PHP cannot render every union introduced by the compatibility sample.
     // Retain the original input as a stable fallback for those mixed shapes.
-    return quicktypeCode(content, className, qtLang, [content], rendererOptions);
+    return quicktypeCode(content, className, qtLang, [content], rendererOptions, preserveIntegerTypes);
   }
 }
 
@@ -175,8 +176,38 @@ export async function generateCode(
   language: CodegenLanguage,
   className: string,
 ): Promise<string> {
+  const parsed = parseBigInt(content);
+  let hasBigInteger = false;
+  const integerPaths = new Set<string>();
+  const fractionalPaths = new Set<string>();
+  function prepareIntegerSamples(value: unknown, path: (string | null)[] = []): unknown {
+    if (typeof value === 'bigint') {
+      hasBigInteger = true;
+      integerPaths.add(JSON.stringify(path));
+      if (FLOAT_ONLY_LANGUAGES.has(language)) {
+        throw new Error(`${language} generation uses number types that cannot represent this integer exactly`);
+      }
+      if (!ARBITRARY_INTEGER_LANGUAGES.has(language) && (value < MIN_I64 || value > MAX_I64)) {
+        throw new Error(`${language} generation cannot represent this integer in its signed 64-bit type`);
+      }
+      // Inference only: a small integer prevents quicktype from misclassifying huge integers as doubles.
+      return 1;
+    }
+    if (typeof value === 'number' && !Number.isInteger(value)) fractionalPaths.add(JSON.stringify(path));
+    if (Array.isArray(value)) return value.map(item => prepareIntegerSamples(item, [...path, null]));
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+        key, prepareIntegerSamples(item, [...path, key]),
+      ]));
+    }
+    return value;
+  }
+  const inferenceData = prepareIntegerSamples(parsed);
+  if ([...integerPaths].some(path => fractionalPaths.has(path))) {
+    throw new Error('Code generation cannot preserve large integers in a field mixed with fractional numbers');
+  }
   if (BACKEND_ONLY_LANGUAGES.has(language)) {
-    return await invoke<string>('json_to_code', { content, language, className });
+    return await invoke<string>('json_to_code', { content: stringifyBigInt(parsed), language, className });
   }
 
   const langConfig = CODEGEN_LANGUAGES.find(l => l.id === language);
@@ -185,15 +216,17 @@ export async function generateCode(
   }
 
   const qtLang = langConfig.quicktypeName;
-  const samples = qtLang === 'php' ? phpInputSamples(content) : [content];
+  const inferenceContent = hasBigInteger ? stringifyBigInt(inferenceData) : content;
+  const samples = qtLang === 'php' ? phpInputSamples(inferenceContent) : [inferenceContent];
   const generated = await quicktypeCode(
-    content,
+    inferenceContent,
     className,
     qtLang,
     samples,
     langConfig.rendererOptions || {},
+    hasBigInteger,
   );
-  return markRootArray(content, language, generated);
+  return markRootArray(parsed, language, generated);
 }
 
 export async function codeToJson(

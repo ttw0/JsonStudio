@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stringifyBigInt } from '$lib/utils/jsonBigInt.js';
   import { t } from '$lib/i18n';
   import {
     buildGridRoot,
@@ -145,7 +146,7 @@
 
   function cellText(value: unknown) {
     if (value === null) return 'null';
-    if (typeof value === 'object') return JSON.stringify(value);
+    if (typeof value === 'object') return stringifyBigInt(value);
     return String(value);
   }
 

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { parseConvertStructuredFormat } from './convertStructuredFormats.js';
+import { stringifyBigInt } from '../utils/jsonBigInt.js';
 
 export function parseProperties(content, { ini = false } = {}) {
   const result = parseConvertStructuredFormat(ini ? 'INI' : 'Properties', content);
@@ -33,12 +34,7 @@ function formatPropertiesValue(value) {
   }
   if (typeof value === 'string') {
     if (/\r|\n/.test(value)) throw new Error('Properties/INI values cannot contain line breaks');
-    const trimmed = value.trim();
-    const needsQuotes = value === ''
-      || value !== trimmed
-      || /[\\"']/.test(value)
-      || /^(?:true|false|null|nil|~|N\/A|-?\d+(?:\.\d+)?)$/i.test(trimmed);
-    return needsQuotes ? JSON.stringify(value) : value;
+    return needsScalarQuotes(value) ? JSON.stringify(value) : value;
   }
   return String(value);
 }
@@ -66,5 +62,14 @@ export function formatMarkdownTable(value) {
 
 function formatMarkdownValue(value) {
   if (value === null) return 'null';
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  if (typeof value === 'string' && needsScalarQuotes(value)) return JSON.stringify(value);
+  return typeof value === 'object' ? stringifyBigInt(value) : String(value);
+}
+
+function needsScalarQuotes(value) {
+  const trimmed = value.trim();
+  return value === ''
+    || value !== trimmed
+    || /[\\"']/.test(value)
+    || /^(?:true|false|null|nil|~|N\/A|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)$/i.test(trimmed);
 }

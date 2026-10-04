@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fetchRemoteSchema, getRemoteSchemaUrl } from '../src/lib/services/schemaReference.js';
+import { validateWithSchema } from '../src/lib/services/schema.ts';
 
 test('extracts only remote HTTPS schema references', () => {
   assert.equal(
@@ -65,4 +66,19 @@ test('rejects schema responses over the size limit', async () => {
     }),
     /5 MiB limit/,
   );
+});
+
+test('remote schema bounds retain all digits before precision validation', async () => {
+  const schema = await fetchRemoteSchema('https://example.com/schema.json', {
+    fetchImpl: async () => new Response('{"minimum":10.000000000000000001,"maximum":9007199254740993}', { status: 200 }),
+  });
+  assert.match(schema, /10\.000000000000000001/);
+  assert.match(schema, /9007199254740993/);
+  assert.equal(validateWithSchema('10', schema).valid, false);
+  assert.equal(validateWithSchema('9007199254740994', schema).valid, false);
+  for (const content of ['123', '[]']) {
+    await assert.rejects(fetchRemoteSchema('https://example.com/schema.json', {
+      fetchImpl: async () => new Response(content, { status: 200 }),
+    }), /must be a JSON object or boolean/);
+  }
 });

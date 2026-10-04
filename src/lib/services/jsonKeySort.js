@@ -1,3 +1,5 @@
+import { stringifyBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * Sort object keys recursively while preserving array order.
  * @param {string} content
@@ -13,7 +15,7 @@ export function sortJsonKeys(content, direction, indent = 2) {
   if ('sourceModel' in parsed && parsed.sourceModel.hasDuplicateKeys) {
     throw new Error('Cannot sort JSON with duplicate keys');
   }
-  return JSON.stringify(sortValue(parsed.data, direction), null, indent);
+  return stringifyBigInt(sortValue(parsed.data, direction), null, indent);
 }
 
 /** @param {unknown} value @param {'asc' | 'desc'} direction @returns {unknown} */

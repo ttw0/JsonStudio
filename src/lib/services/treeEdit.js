@@ -1,3 +1,5 @@
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * @param {{ parentType?: 'object' | 'array' }} node
  */
@@ -338,7 +340,7 @@ export function createTreeValueCopyText(content, pointers, path, value) {
     return content.slice(start, end);
   }
 
-  return JSON.stringify(value) ?? 'null';
+  return value === undefined ? 'null' : stringifyBigInt(value);
 }
 
 /**
@@ -429,7 +431,7 @@ function joinPointer(segments) {
  * @param {unknown} value
  */
 function cloneJsonValue(value) {
-  return JSON.parse(JSON.stringify(value));
+  return parseBigInt(stringifyBigInt(value));
 }
 
 /**

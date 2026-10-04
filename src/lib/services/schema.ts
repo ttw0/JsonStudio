@@ -1,5 +1,5 @@
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
+import { validatePrecisionSchema } from './precisionSchema.js';
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
 
 export interface SchemaError {
   path: string;
@@ -16,6 +16,7 @@ function inferType(value: unknown): Record<string, unknown> {
   if (value === null) return { type: 'null' };
   if (Array.isArray(value)) return inferArray(value);
   switch (typeof value) {
+    case 'bigint': return { type: 'integer' };
     case 'string': return inferString(value);
     case 'number': return Number.isInteger(value) ? { type: 'integer' } : { type: 'number' };
     case 'boolean': return { type: 'boolean' };
@@ -43,7 +44,7 @@ function inferString(value: string): Record<string, unknown> {
 }
 
 function inferObject(obj: Record<string, unknown>): Record<string, unknown> {
-  const properties: Record<string, unknown> = {};
+  const properties: Record<string, unknown> = Object.create(null);
   const required: string[] = [];
 
   for (const [key, val] of Object.entries(obj)) {
@@ -102,9 +103,9 @@ function mergeSchemas(schemas: Record<string, unknown>[]): Record<string, unknow
 }
 
 function mergeObjectSchemas(schemas: Record<string, unknown>[]): Record<string, unknown> {
-  const allProperties: Record<string, Record<string, unknown>[]> = {};
+  const allProperties: Record<string, Record<string, unknown>[]> = Object.create(null);
   const allKeys = new Set<string>();
-  const requiredCounts: Record<string, number> = {};
+  const requiredCounts: Record<string, number> = Object.create(null);
 
   for (const schema of schemas) {
     const props = (schema.properties || {}) as Record<string, Record<string, unknown>>;
@@ -120,7 +121,7 @@ function mergeObjectSchemas(schemas: Record<string, unknown>[]): Record<string, 
     }
   }
 
-  const mergedProps: Record<string, unknown> = {};
+  const mergedProps: Record<string, unknown> = Object.create(null);
   for (const key of allKeys) {
     mergedProps[key] = mergeSchemas(allProperties[key] || []);
   }
@@ -140,35 +141,14 @@ function mergeObjectSchemas(schemas: Record<string, unknown>[]): Record<string, 
 }
 
 export function generateSchema(jsonContent: string): string {
-  const data = JSON.parse(jsonContent);
+  const data = parseBigInt(jsonContent);
   const schema: Record<string, unknown> = {
     $schema: 'http://json-schema.org/draft-07/schema#',
     ...inferType(data),
   };
-  return JSON.stringify(schema, null, 2);
+  return stringifyBigInt(schema, null, 2);
 }
 
 export function validateWithSchema(jsonContent: string, schemaContent: string): ValidateResult {
-  const data = JSON.parse(jsonContent);
-  const schema = JSON.parse(schemaContent);
-
-  delete schema.$schema;
-
-  const instance = new Ajv({ allErrors: true, verbose: true, strict: false, logger: false });
-  addFormats(instance);
-
-  const validate = instance.compile(schema);
-  const valid = validate(data) as boolean;
-
-  if (valid) {
-    return { valid: true, errors: [] };
-  }
-
-  const errors: SchemaError[] = (validate.errors || []).map(err => ({
-    path: err.instancePath || '/',
-    message: err.message || 'Validation error',
-    keyword: err.keyword,
-  }));
-
-  return { valid, errors };
+  return validatePrecisionSchema(jsonContent, schemaContent);
 }

@@ -63,6 +63,7 @@ function cloneWithChildren(model) {
 
 /** @param {unknown} value */
 function getValueType(value) {
+  if (typeof value === 'bigint') return 'number';
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
   return typeof value === 'object' ? 'object' : typeof value;

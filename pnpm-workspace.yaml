@@ -4,3 +4,7 @@ packages:
 allowBuilds:
   core-js: true
   esbuild: true
+
+patchedDependencies:
+  jmespath@0.16.0: patches/jmespath@0.16.0.patch
+  lossless-json@4.3.1: patches/lossless-json@4.3.1.patch

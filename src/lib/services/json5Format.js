@@ -1,6 +1,7 @@
 import * as prettier from 'prettier/standalone';
 import * as babelPlugin from 'prettier/plugins/babel';
 import * as estreePlugin from 'prettier/plugins/estree';
+import { convertToStandardJson } from './jsonToStandard.js';
 
 /**
  * Format JSON5 while keeping JSON5 syntax instead of converting it to strict JSON.
@@ -26,10 +27,5 @@ export async function formatJson5(content, indent = 2) {
  * @returns {Promise<string>}
  */
 export async function formatJsonText(content, indent = 2) {
-  return await prettier.format(content, {
-    parser: 'json-stringify',
-    plugins: [babelPlugin, estreePlugin],
-    tabWidth: indent,
-    endOfLine: 'lf', // Use LF for consistency across platforms (fixes Windows CRLF issues)
-  });
+  return `${convertToStandardJson(content, indent)}\n`;
 }

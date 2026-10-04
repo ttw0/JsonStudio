@@ -8,6 +8,7 @@
   import { registerMonacoThemes, type EditorTheme } from '$lib/config/monacoThemes';
   import { t } from '$lib/i18n';
   import { normalizeLineEndings } from '$lib/services/lineEndings';
+  import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   type DiffSide = 'original' | 'modified';
 
@@ -44,10 +45,10 @@
   } = $props();
 
   let container: HTMLDivElement;
-  let diffEditor: Monaco.editor.IStandaloneDiffEditor | null = null;
+  let diffEditor = $state.raw<Monaco.editor.IStandaloneDiffEditor | null>(null);
   let monaco = $state<typeof Monaco | null>(null);
-  let originalModel: Monaco.editor.ITextModel | null = null;
-  let modifiedModel: Monaco.editor.ITextModel | null = null;
+  let originalModel = $state.raw<Monaco.editor.ITextModel | null>(null);
+  let modifiedModel = $state.raw<Monaco.editor.ITextModel | null>(null);
   let isSyncingOriginal = false;
   let isSyncingModified = false;
   let originalPasteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,11 +88,7 @@
 
   export function minify(): string {
     const value = getValue();
-    try {
-      return JSON.stringify(JSON.parse(value));
-    } catch (_) {
-      return value;
-    }
+    return minifyNumericJson(value);
   }
 
   export function foldAll() {
@@ -180,7 +177,6 @@
     monaco = monacoInstance;
 
     registerMonacoThemes(monacoInstance);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (monacoInstance.languages.json as any).jsonDefaults?.setDiagnosticsOptions({
       validate: true,
       allowComments: false,

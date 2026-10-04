@@ -1,5 +1,5 @@
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 const TOML_ROOT_ARRAY_MARKER: &str = "# jsonstudio:root-array";
 const XML_KEY_ATTR: &str = "jsonstudio-key";
@@ -8,6 +8,7 @@ const XML_KEY_ATTR: &str = "jsonstudio-key";
 pub fn json_to_yaml(content: &str) -> Result<String, String> {
     let value: Value = serde_json::from_str(content)
         .map_err(|e| format!("Invalid JSON: {}", e))?;
+    ensure_native_number_range(&value, "YAML", false)?;
     serde_yaml::to_string(&value)
         .map_err(|e| format!("YAML conversion failed: {}", e))
 }
@@ -17,6 +18,7 @@ pub fn json_to_toml(content: &str) -> Result<String, String> {
     let value: Value = serde_json::from_str(content)
         .map_err(|e| format!("Invalid JSON: {}", e))?;
     let is_root_array = value.is_array();
+    ensure_native_number_range(&value, "TOML", true)?;
 
     // TOML requires a top-level table; wrap arrays automatically
     let table_value = match &value {
@@ -103,7 +105,7 @@ fn value_to_xml_node(
             }
         }
         Value::String(s) => {
-            xml.push_str(&format!("{}<{}{}>{}</{}>\n", indent, tag, key_attr, escape_xml(s), tag));
+            xml.push_str(&format!("{}<{} type=\"string\"{}>{}</{}>\n", indent, tag, key_attr, escape_xml(s), tag));
         }
         Value::Number(n) => {
             xml.push_str(&format!("{}<{}{}>{}</{}>\n", indent, tag, key_attr, n, tag));
@@ -205,10 +207,67 @@ pub fn json_to_csv(content: &str) -> Result<String, String> {
 
 #[tauri::command]
 pub fn yaml_to_json(content: &str) -> Result<String, String> {
+    let parsed: serde_yaml::Value = serde_yaml::from_str(content)
+        .map_err(|e| format!("Invalid YAML: {e}"))?;
+    ensure_yaml_number_range(&parsed)?;
     let value: Value = serde_yaml::from_str(content)
         .map_err(|e| format!("Invalid YAML: {}", e))?;
     serde_json::to_string_pretty(&value)
         .map_err(|e| format!("JSON conversion failed: {}", e))
+}
+
+fn ensure_native_number_range(value: &Value, format: &str, signed_only: bool) -> Result<(), String> {
+    match value {
+        Value::Number(number) => {
+            let raw = number.to_string();
+            let integer = !raw.contains(['.', 'e', 'E']);
+            if integer && (number.as_i64().is_none() && (signed_only || number.as_u64().is_none())) {
+                return Err(format!("{format} native conversion cannot represent this integer exactly: {raw}"));
+            }
+            if !integer {
+                let float = number.as_f64().filter(|value| value.is_finite());
+                if float.is_none() || float.is_some_and(|value| value.abs() > 9_007_199_254_740_991.0) {
+                    return Err(format!("{format} native conversion would lose numeric precision: {raw}"));
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                ensure_native_number_range(value, format, signed_only)?;
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values() {
+                ensure_native_number_range(value, format, signed_only)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn ensure_yaml_number_range(value: &serde_yaml::Value) -> Result<(), String> {
+    match value {
+        serde_yaml::Value::Number(number) if number.as_i64().is_none() && number.as_u64().is_none() => {
+            if number.as_f64().is_none_or(|value| !value.is_finite() || value.abs() > 9_007_199_254_740_991.0) {
+                return Err("YAML native conversion requires the lossless YAML parser for this numeric value".into());
+            }
+        }
+        serde_yaml::Value::Sequence(values) => {
+            for value in values {
+                ensure_yaml_number_range(value)?;
+            }
+        }
+        serde_yaml::Value::Mapping(values) => {
+            for (key, value) in values {
+                ensure_yaml_number_range(key)?;
+                ensure_yaml_number_range(value)?;
+            }
+        }
+        serde_yaml::Value::Tagged(value) => ensure_yaml_number_range(&value.value)?,
+        _ => {}
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -220,6 +279,7 @@ pub fn toml_to_json(content: &str) -> Result<String, String> {
         .unwrap_or(false);
     let value: Value = toml::from_str(content)
         .map_err(|e| format!("Invalid TOML: {}", e))?;
+    ensure_native_number_range(&value, "TOML", true)?;
     let value = if is_root_array {
         match value {
             Value::Object(mut map) if map.len() == 1 => match map.remove("items") {
@@ -242,11 +302,29 @@ pub fn xml_to_json(content: &str) -> Result<String, String> {
         .map_err(|e| format!("JSON conversion failed: {}", e))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum XmlValueKind {
+    Unspecified,
+    Array,
+    Object,
+    String,
+}
+
+enum XmlChild {
+    Element(String, Value),
+    Text(String),
+}
+
+struct XmlFrame {
+    key: String,
+    kind: XmlValueKind,
+    children: Vec<XmlChild>,
+}
+
 fn parse_xml_element_metadata(
     element: &quick_xml::events::BytesStart<'_>,
-) -> Result<(bool, bool, Option<String>), String> {
-    let mut is_array = false;
-    let mut is_object = false;
+) -> Result<(XmlValueKind, Option<String>), String> {
+    let mut kind = XmlValueKind::Unspecified;
     let mut original_key = None;
     for attr in element.attributes() {
         let attr = attr.map_err(|e| format!("Invalid XML attribute: {}", e))?;
@@ -254,14 +332,16 @@ fn parse_xml_element_metadata(
             .unescape_value()
             .map_err(|e| format!("XML attribute decode error: {}", e))?;
         if attr.key.as_ref() == b"type" && value == "array" {
-            is_array = true;
+            kind = XmlValueKind::Array;
         } else if attr.key.as_ref() == b"type" && value == "object" {
-            is_object = true;
+            kind = XmlValueKind::Object;
+        } else if attr.key.as_ref() == b"type" && value == "string" {
+            kind = XmlValueKind::String;
         } else if attr.key.as_ref() == XML_KEY_ATTR.as_bytes() {
             original_key = Some(value.into_owned());
         }
     }
-    Ok((is_array, is_object, original_key))
+    Ok((kind, original_key))
 }
 
 fn parse_xml_to_value(xml_str: &str) -> Result<Value, String> {
@@ -269,9 +349,7 @@ fn parse_xml_to_value(xml_str: &str) -> Result<Value, String> {
     use quick_xml::reader::Reader;
 
     let mut reader = Reader::from_str(xml_str);
-    reader.config_mut().trim_text(true);
-
-    let mut stack: Vec<(String, Option<String>, Vec<(String, Value)>, bool, bool)> = Vec::new();
+    let mut stack: Vec<XmlFrame> = Vec::new();
     let mut root_value: Option<Value> = None;
     let mut root_is_object = false;
 
@@ -279,43 +357,33 @@ fn parse_xml_to_value(xml_str: &str) -> Result<Value, String> {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let (is_array, is_object, original_key) = parse_xml_element_metadata(&e)?;
-                stack.push((tag, original_key, Vec::new(), is_array, is_object));
+                let (kind, original_key) = parse_xml_element_metadata(&e)?;
+                stack.push(XmlFrame {
+                    key: original_key.unwrap_or(tag),
+                    kind,
+                    children: Vec::new(),
+                });
             }
             Ok(Event::End(_)) => {
-                if let Some((tag, original_key, children, is_array, is_object)) = stack.pop() {
-                    let value = children_to_value(children, is_array, is_object);
+                if let Some(frame) = stack.pop() {
+                    let value = children_to_value(frame.children, frame.kind)?;
                     if let Some(parent) = stack.last_mut() {
-                        parent.2.push((original_key.unwrap_or(tag), value));
+                        parent.children.push(XmlChild::Element(frame.key, value));
                     } else {
-                        root_is_object = is_object;
+                        root_is_object = frame.kind == XmlValueKind::Object;
                         root_value = Some(value);
                     }
                 }
             }
             Ok(Event::Empty(e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let (is_array, is_object, original_key) = parse_xml_element_metadata(&e)?;
+                let (kind, original_key) = parse_xml_element_metadata(&e)?;
+                let value = children_to_value(Vec::new(), kind)?;
                 if let Some(parent) = stack.last_mut() {
-                    let value = if is_array {
-                        Value::Array(Vec::new())
-                    } else if is_object {
-                        Value::Object(serde_json::Map::new())
-                    } else {
-                        Value::Null
-                    };
-                    parent
-                        .2
-                        .push((original_key.unwrap_or(tag), value));
+                    parent.children.push(XmlChild::Element(original_key.unwrap_or(tag), value));
                 } else {
-                    root_is_object = is_object;
-                    root_value = Some(if is_array {
-                        Value::Array(Vec::new())
-                    } else if is_object {
-                        Value::Object(serde_json::Map::new())
-                    } else {
-                        Value::Null
-                    });
+                    root_is_object = kind == XmlValueKind::Object;
+                    root_value = Some(value);
                 }
             }
             Ok(Event::Text(e)) => {
@@ -324,10 +392,9 @@ fn parse_xml_to_value(xml_str: &str) -> Result<Value, String> {
                 let text = quick_xml::escape::unescape(raw)
                     .map_err(|err| format!("XML unescape error: {}", err))?
                     .to_string();
-                if !text.is_empty() {
-                    if let Some(parent) = stack.last_mut() {
-                        parent.2.push(("__text__".to_string(), text_to_typed_value(&text)));
-                    }
+                if let Some(parent) = stack.last_mut() {
+                    if parent.kind != XmlValueKind::String && text.trim().is_empty() { continue; }
+                    parent.children.push(XmlChild::Text(text));
                 }
             }
             Ok(Event::CData(e)) => {
@@ -336,13 +403,23 @@ fn parse_xml_to_value(xml_str: &str) -> Result<Value, String> {
                 let text = raw.to_string();
                 if !text.is_empty() {
                     if let Some(parent) = stack.last_mut() {
-                        parent.2.push(("__text__".to_string(), text_to_typed_value(&text)));
+                        parent.children.push(XmlChild::Text(text));
                     }
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                let raw = std::str::from_utf8(e.as_ref())
+                    .map_err(|err| format!("XML entity decode error: {err}"))?;
+                let reference = format!("&{raw};");
+                let text = quick_xml::escape::unescape(&reference)
+                    .map_err(|err| format!("XML entity decode error: {err}"))?;
+                if let Some(parent) = stack.last_mut() {
+                    parent.children.push(XmlChild::Text(text.into_owned()));
                 }
             }
             Ok(Event::Eof) => break,
             Ok(Event::Decl(_)) | Ok(Event::Comment(_)) | Ok(Event::PI(_))
-            | Ok(Event::DocType(_)) | Ok(Event::GeneralRef(_)) => {}
+            | Ok(Event::DocType(_)) => {}
             Err(e) => return Err(format!("Invalid XML: {}", e)),
         }
     }
@@ -364,76 +441,55 @@ fn text_to_typed_value(text: &str) -> Value {
     if text == "false" {
         return Value::Bool(false);
     }
-    if let Ok(n) = text.parse::<i64>() {
-        return Value::Number(serde_json::Number::from(n));
-    }
-    if let Ok(n) = text.parse::<f64>() {
-        if let Some(num) = serde_json::Number::from_f64(n) {
-            return Value::Number(num);
-        }
+    if let Ok(Value::Number(number)) = serde_json::from_str::<Value>(text) {
+        return Value::Number(number);
     }
     Value::String(text.to_string())
 }
 
-fn children_to_value(children: Vec<(String, Value)>, is_array: bool, is_object: bool) -> Value {
-    if is_array {
-        let mut arr = Vec::new();
-        for (k, v) in children {
-            if k != "__text__" {
-                arr.push(v);
-            }
+fn children_to_value(children: Vec<XmlChild>, kind: XmlValueKind) -> Result<Value, String> {
+    let mut elements = Vec::new();
+    let mut text: Option<String> = None;
+    for child in children {
+        match child {
+            XmlChild::Element(key, value) => elements.push((key, value)),
+            XmlChild::Text(chunk) => text.get_or_insert_with(String::new).push_str(&chunk),
         }
-        return Value::Array(arr);
     }
-
-    if is_object && children.is_empty() {
-        return Value::Object(serde_json::Map::new());
-    }
-    if children.is_empty() {
-        return Value::Null;
-    }
-    // Text-only element
-    if children.len() == 1 && children[0].0 == "__text__" {
-        return children[0].1.clone();
-    }
-    // Filter out text nodes when mixed with elements
-    let element_children: Vec<&(String, Value)> = children.iter()
-        .filter(|(k, _)| k != "__text__")
-        .collect();
-    if element_children.is_empty() {
-        if let Some((_, v)) = children.first() {
-            return v.clone();
+    if kind == XmlValueKind::String {
+        if !elements.is_empty() {
+            return Err("XML string elements cannot contain child elements".into());
         }
-        return Value::Null;
+        return Ok(Value::String(text.unwrap_or_default()));
+    }
+    if kind == XmlValueKind::Array {
+        return Ok(Value::Array(elements.into_iter().map(|(_, value)| value).collect()));
+    }
+    if elements.is_empty() {
+        return Ok(match text {
+            Some(text) => text_to_typed_value(text.trim()),
+            None if kind == XmlValueKind::Object => Value::Object(serde_json::Map::new()),
+            None => Value::Null,
+        });
     }
 
-    // Check for repeated tags → array
-    let mut tag_counts = std::collections::HashMap::new();
-    for (tag, _) in &element_children {
-        *tag_counts.entry(tag.as_str()).or_insert(0usize) += 1;
+    let mut tag_counts = HashMap::new();
+    for (key, _) in &elements {
+        *tag_counts.entry(key.clone()).or_insert(0usize) += 1;
     }
-
     let mut map = serde_json::Map::new();
-    let mut array_tags: HashSet<String> = HashSet::new();
-
-    for (tag, count) in &tag_counts {
-        if *count > 1 {
-            array_tags.insert(tag.to_string());
-        }
-    }
-
-    for (tag, value) in element_children {
-        if array_tags.contains(tag.as_str()) {
-            let entry = map.entry(tag.clone()).or_insert_with(|| Value::Array(vec![]));
+    for (tag, value) in elements {
+        if tag_counts[&tag] > 1 {
+            let entry = map.entry(tag).or_insert_with(|| Value::Array(vec![]));
             if let Value::Array(arr) = entry {
-                arr.push(value.clone());
+                arr.push(value);
             }
         } else {
-            map.insert(tag.clone(), value.clone());
+            map.insert(tag, value);
         }
     }
 
-    Value::Object(map)
+    Ok(Value::Object(map))
 }
 
 #[tauri::command]
@@ -472,6 +528,59 @@ pub fn csv_to_json(content: &str) -> Result<String, String> {
 mod tests {
     use super::{json_to_xml, xml_to_json};
     use serde_json::Value;
+
+    #[test]
+    fn xml_and_csv_preserve_arbitrary_integer_text() {
+        for number in ["9007199254740993".to_string(), "18446744073709551615".to_string(), "9".repeat(400)] {
+            let object = format!("{{\"id\":{number},\"negative\":-{number}}}");
+            let xml = super::json_to_xml(&object).unwrap();
+            let xml_json = super::xml_to_json(&xml).unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&xml_json).unwrap(),
+                serde_json::from_str::<Value>(&object).unwrap(),
+            );
+            let array = format!("[{object}]");
+            let csv = super::json_to_csv(&array).unwrap();
+            let csv_json = super::csv_to_json(&csv).unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&csv_json).unwrap(),
+                serde_json::from_str::<Value>(&array).unwrap(),
+            );
+        }
+    }
+
+    #[test]
+    fn formats_with_native_numeric_limits_do_not_silently_round() {
+        let source = "{\"id\":123456789012345678901234567890}";
+        assert!(super::json_to_toml(source).unwrap_err().contains("exactly"));
+        assert!(super::json_to_yaml(source).unwrap_err().contains("exactly"));
+        assert!(super::yaml_to_json("id: 123456789012345678901234567890").is_err());
+        assert!(super::toml_to_json("id = 9.007199254740993e15").unwrap_err().contains("precision"));
+        assert!(super::toml_to_json("id = 9223372036854775807").is_ok());
+    }
+
+    #[test]
+    fn xml_preserves_numeric_strings_and_exact_integer_numbers() {
+        let source = r#"{"id":9007199254740993,"stringId":"9007199254740993","exponent":"9.007199254740993e15","empty":"","spaces":"  123  ","boolean":"true","escaped":"<&>"}"#;
+        let xml = json_to_xml(source).unwrap();
+        let converted = xml_to_json(&xml).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&converted).unwrap(), serde_json::from_str::<Value>(source).unwrap());
+    }
+
+    #[test]
+    fn xml_field_names_do_not_collide_with_internal_text_nodes() {
+        for source in [
+            r#"{"__text__":9007199254740993}"#,
+            r#"{"__text__":"9007199254740993","id":18446744073709551615}"#,
+            r#"{"nested":{"__text__":{"id":9007199254740993}}}"#,
+            r#"[{"__text__":9007199254740993}]"#,
+        ] {
+            let xml = json_to_xml(source).unwrap();
+            let converted = xml_to_json(&xml).unwrap();
+            assert_eq!(serde_json::from_str::<Value>(&converted).unwrap(), serde_json::from_str::<Value>(source).unwrap());
+        }
+        assert_eq!(xml_to_json(r#"<root type="array"><__text__>9007199254740993</__text__></root>"#).unwrap(), "[\n  9007199254740993\n]");
+    }
 
     #[test]
     fn structured_formats_round_trip_with_windows_line_endings() {

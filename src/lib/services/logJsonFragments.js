@@ -1,4 +1,5 @@
 import { jsonrepair } from 'jsonrepair';
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
 import {
   findGoMapLiteralOpener,
   formatPrintedStructure,
@@ -151,7 +152,7 @@ export function getStandaloneEscapedJsonContent(content) {
   }
 
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = parseBigInt(trimmed);
     if (typeof parsed !== 'string' || !parsed.trim()) {
       return null;
     }
@@ -225,7 +226,7 @@ function normalizeJsonCandidate(value, indent, kindHint) {
  */
 function tryFormatJson(value, indent) {
   try {
-    return JSON.stringify(JSON.parse(value), null, indent);
+    return stringifyBigInt(parseBigInt(value), null, indent);
   } catch {
     return null;
   }
@@ -240,7 +241,7 @@ function tryRepair(value, indent) {
   if (hasAmbiguousCommentInBareValue(value)) return null;
   try {
     const repaired = jsonrepair(value);
-    return JSON.stringify(JSON.parse(repaired), null, indent);
+    return stringifyBigInt(parseBigInt(repaired), null, indent);
   } catch {
     return null;
   }
@@ -252,14 +253,14 @@ function tryRepair(value, indent) {
  */
 function tryUnescapeLoose(value) {
   try {
-    const parsed = JSON.parse(value);
+    const parsed = parseBigInt(value);
     return typeof parsed === 'string' ? parsed : null;
   } catch {
     try {
       const escapedLineBreaks = value
         .replace(/\r/g, '\\r')
         .replace(/\n/g, '\\n');
-      const parsed = JSON.parse(`"${escapedLineBreaks}"`);
+      const parsed = parseBigInt(`"${escapedLineBreaks}"`);
       return typeof parsed === 'string' ? parsed : null;
     } catch {
       return null;

@@ -30,6 +30,8 @@
  * }} JsonlDocument
  */
 
+import { parseBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * Parse newline-delimited JSON without changing the source text.
  * Blank lines are counted in the summary but omitted from the record list so
@@ -61,7 +63,7 @@ export function parseJsonl(source) {
     recordNumber += 1;
     const id = `${lineNumber}:${recordNumber}`;
     try {
-      const value = JSON.parse(trimmed);
+      const value = parseBigInt(trimmed);
       const shape = getJsonlValueShape(value);
       const fields = getObjectFields(value);
 
@@ -139,7 +141,7 @@ export function getJsonlValueShape(value) {
   if (Array.isArray(value)) return 'array';
   if (typeof value === 'object') return 'object';
   if (typeof value === 'string') return 'string';
-  if (typeof value === 'number') return 'number';
+  if (typeof value === 'number' || typeof value === 'bigint') return 'number';
   return 'boolean';
 }
 

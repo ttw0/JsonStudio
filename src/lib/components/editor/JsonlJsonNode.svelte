@@ -42,7 +42,7 @@
     if (Array.isArray(input)) return 'array';
     if (typeof input === 'object') return 'object';
     if (typeof input === 'string') return 'string';
-    if (typeof input === 'number') return 'number';
+    if (typeof input === 'number' || typeof input === 'bigint') return 'number';
     return 'boolean';
   }
 

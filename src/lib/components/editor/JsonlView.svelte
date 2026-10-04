@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stringifyBigInt } from '$lib/utils/jsonBigInt.js';
   import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { t } from '$lib/i18n';
@@ -272,10 +273,6 @@
     }
   }
 
-  function formatExpandedValue(row: JsonlRow) {
-    return row.kind === 'invalid' ? row.raw : JSON.stringify(row.value, null, 2);
-  }
-
   function getTopLevelFieldValue(value: unknown, field: string) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
     return Object.prototype.hasOwnProperty.call(value, field)
@@ -286,8 +283,8 @@
   function formatFieldValue(value: unknown) {
     if (value === null) return 'null';
     if (typeof value === 'string') return value;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    return JSON.stringify(value);
+    if (typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') return String(value);
+    return stringifyBigInt(value);
   }
 
 </script>
@@ -545,7 +542,7 @@
                 </div>
               {/if}
               {#if row.kind === 'invalid'}
-                <pre class="jsonl-invalid-source" data-testid="jsonl-expanded-json">{formatExpandedValue(row)}</pre>
+                <pre class="jsonl-invalid-source" data-testid="jsonl-expanded-json">{row.raw}</pre>
               {:else}
                 <JsonlJsonViewer value={row.value} valueKey={row.id} />
               {/if}

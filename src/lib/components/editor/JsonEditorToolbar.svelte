@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import type * as Monaco from 'monaco-editor';
   import { escapeString, minifyJson, unescapeString } from '$lib/services/json';
   import { sortJsonKeys } from '$lib/services/jsonKeySort.js';
   import { convertToStandardJson } from '$lib/services/jsonToStandard.js';
@@ -36,6 +37,9 @@
   type JsonOperationContext = {
     content: string;
     editor: ReturnType<JsonEditorTarget['getEditorInstance']>;
+    model: Monaco.editor.ITextModel | null;
+    version: number | undefined;
+    tabId: string | undefined;
   };
 
   type TitlebarPlatform = 'macos' | 'windows' | 'linux';
@@ -530,15 +534,23 @@
   }
 
   function captureJsonOperationContext(): JsonOperationContext {
+    const editor = jsonEditor?.getEditorInstance() ?? null;
+    const model = editor?.getModel() ?? null;
     return {
       content: jsonContent,
-      editor: jsonEditor?.getEditorInstance() ?? null,
+      editor,
+      model,
+      version: model?.getVersionId(),
+      tabId: activeTab?.id,
     };
   }
 
   function isJsonOperationContextCurrent(context: JsonOperationContext): boolean {
     if (jsonContent !== context.content) return false;
     if ((jsonEditor?.getEditorInstance() ?? null) !== context.editor) return false;
+    if (activeTab?.id !== context.tabId) return false;
+    if ((context.editor?.getModel() ?? null) !== context.model) return false;
+    if (context.model?.getVersionId() !== context.version) return false;
 
     // Normalize line endings before comparison to handle Windows CRLF vs Unix LF
     // This fixes Issue #76 where operations fail on Windows due to line ending mismatches
@@ -618,6 +630,7 @@
       if (!setJsonContentValue(formatted, operation)) return;
       await onJsonStatsUpdate();
     } catch (e) {
+      if (isJsonOperationContextCurrent(operation)) onToast(String(e instanceof Error ? e.message : e), 'error');
     } finally {
       isProcessing = false;
     }
@@ -646,6 +659,7 @@
         await onJsonStatsUpdate();
       }
     } catch (e) {
+      if (isJsonOperationContextCurrent(operation)) onToast(String(e instanceof Error ? e.message : e), 'error');
     } finally {
       isProcessing = false;
     }
@@ -791,6 +805,7 @@
         await onJsonStatsUpdate();
       }
     } catch (e) {
+      if (isJsonOperationContextCurrent(operation)) onToast(String(e instanceof Error ? e.message : e), 'error');
     } finally {
       isProcessing = false;
     }

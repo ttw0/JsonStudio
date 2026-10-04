@@ -1,3 +1,5 @@
+import { parseNumericLiteral } from '../utils/jsonBigInt.js';
+
 /**
  * @param {{ value: unknown; expandable: boolean; exists?: boolean }} cell
  */
@@ -6,6 +8,7 @@ export function isGridCellEditable(cell) {
     cell.value === null ||
     typeof cell.value === 'string' ||
     typeof cell.value === 'number' ||
+    typeof cell.value === 'bigint' ||
     typeof cell.value === 'boolean'
   );
 }
@@ -59,13 +62,12 @@ export function formatGridEditValue(currentValue, input, originalSource, dialect
 
   const trimmed = input.trim();
 
-  if (typeof currentValue === 'number') {
+  if (typeof currentValue === 'number' || typeof currentValue === 'bigint') {
     const strictJsonNumber = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
     const json5Number = /^[+-]?(?:Infinity|NaN|0[xX][0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$/;
     const isValidNumber = dialect === 'JSON5'
       ? json5Number.test(trimmed)
       : strictJsonNumber.test(trimmed);
-    const parsedNumber = Number(trimmed);
     const preservesJson5SpecialNumber = dialect === 'JSON5' && (
       trimmed === 'Infinity' ||
       trimmed === '+Infinity' ||
@@ -74,9 +76,14 @@ export function formatGridEditValue(currentValue, input, originalSource, dialect
       trimmed === '+NaN' ||
       trimmed === '-NaN'
     );
-    return isValidNumber && (Number.isFinite(parsedNumber) || preservesJson5SpecialNumber)
-      ? { ok: true, text: trimmed }
-      : { ok: false, error: 'Invalid number' };
+    if (!isValidNumber) return { ok: false, error: 'Invalid number' };
+    if (preservesJson5SpecialNumber) return { ok: true, text: trimmed };
+    try {
+      parseNumericLiteral(trimmed);
+      return { ok: true, text: trimmed };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Invalid number' };
+    }
   }
 
   if (typeof currentValue === 'boolean') {

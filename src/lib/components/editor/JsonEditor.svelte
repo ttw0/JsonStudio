@@ -1388,12 +1388,12 @@
     } catch (e) {}
   }
   
-  function handleEditorChange(newValue: string) {
+  function handleEditorChange(newValue: string, markModified = true) {
     const currentTab = $activeTab;
     if (!currentTab) return;
     if (isEditorModelPending || editorModelKey !== currentTab.id) return;
     setContentState(newValue, { syncRightPanel: true });
-    tabsStore.updateTabContent(currentTab.id, newValue);
+    tabsStore.updateTabContent(currentTab.id, newValue, markModified);
     if (isJsonlTab(currentTab)) jsonlSummary = null;
 
     if (statsTimer) clearTimeout(statsTimer);
@@ -1711,6 +1711,7 @@
                   lineHeight={lineHeight}
                   tabSize={tabSize}
                   onChange={handleEditorChange}
+                  onValueNormalized={(value) => handleEditorChange(value, false)}
                   onPaste={handleEditorPaste}
                 />
               </div>

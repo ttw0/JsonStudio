@@ -1,3 +1,6 @@
+import BigNumber from 'bignumber.js';
+import { parseBigInt, parseDecimalLiteral, stringifyBigInt } from '../utils/jsonBigInt.js';
+
 const MAX_SCHEMA_BYTES = 5 * 1024 * 1024;
 const SCHEMA_SIZE_ERROR = 'Schema response exceeds the 5 MiB limit';
 
@@ -20,7 +23,7 @@ function parseRemoteHttpsUrl(value) {
  * @returns {string | null}
  */
 export function getRemoteSchemaUrl(jsonContent) {
-  const data = JSON.parse(jsonContent);
+  const data = parseBigInt(jsonContent);
   const schemaUrl = data && typeof data === 'object' && !Array.isArray(data) ? data.$schema : null;
 
   return typeof schemaUrl === 'string' ? parseRemoteHttpsUrl(schemaUrl) : null;
@@ -59,12 +62,13 @@ export async function fetchRemoteSchema(schemaUrl, options = {}) {
     throw new Error(SCHEMA_SIZE_ERROR);
   }
 
-  const schema = JSON.parse(schemaText);
-  if (schema === null || (typeof schema !== 'object' && typeof schema !== 'boolean')) {
+  const schema = parseBigInt(schemaText, parseDecimalLiteral);
+  if (schema === null || Array.isArray(schema) || BigNumber.isBigNumber(schema) ||
+    (typeof schema !== 'object' && typeof schema !== 'boolean')) {
     throw new Error('Fetched schema must be a JSON object or boolean');
   }
 
-  return JSON.stringify(schema, null, 2);
+  return stringifyBigInt(schema, null, 2);
 }
 
 /**

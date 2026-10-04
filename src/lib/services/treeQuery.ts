@@ -1,3 +1,5 @@
+import { searchJmesPath, searchJsonPath } from './precisionQuery.js';
+
 export type QueryMode = 'jmespath' | 'jsonpath';
 
 export type QueryTreeNode = {
@@ -58,13 +60,7 @@ async function runJmesPathQuery(
   data: unknown,
   nodes: QueryTreeNode[]
 ): Promise<TreeQueryState> {
-  const jmespath = await import('jmespath');
-  const search = jmespath.search ?? jmespath.default?.search ?? jmespath.default;
-  if (typeof search !== 'function') {
-    throw new Error('JMESPath search not available');
-  }
-
-  const result = search(data, query);
+  const result = searchJmesPath(data, query);
   const resultItems = Array.isArray(result) ? result : [result];
   const needsDeepEqual = resultItems.some((item) => item && typeof item === 'object');
   let deepEqual: ((a: unknown, b: unknown) => boolean) | null = null;
@@ -105,13 +101,7 @@ async function runJmesPathQuery(
 }
 
 async function runJsonPathQuery(query: string, data: unknown): Promise<TreeQueryState> {
-  const { JSONPath } = await import('jsonpath-plus');
-  const result = JSONPath({
-    path: query,
-    json: data as null | boolean | number | string | object | any[],
-    resultType: 'pointer',
-    wrap: true,
-  });
+  const result = searchJsonPath(data, query);
 
   const pointers = Array.isArray(result)
     ? result

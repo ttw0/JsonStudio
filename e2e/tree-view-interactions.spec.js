@@ -195,6 +195,11 @@ test('clicking another Tree row commits the edit and preserves expanded nodes', 
 });
 
 test('dragging a Tree node reorders the JSON document', async ({ page }) => {
+  const buildVersion = Number(await page.getByTestId('tree-ready').getAttribute('data-tree-build-version'));
+  await page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    (await initMonaco()).editor.getEditors()[0].setPosition({ lineNumber: 1, column: 1 });
+  });
   const firstRow = treeRow(page, '/first');
   const secondRow = treeRow(page, '/second');
   const firstBox = await firstRow.boundingBox();
@@ -226,5 +231,14 @@ test('dragging a Tree node reorders the JSON document', async ({ page }) => {
     const firstLine = lines.findIndex((line) => line.includes('"first"'));
     return secondLine >= 0 && firstLine >= 0 && secondLine < firstLine;
   }).toBe(true);
+  await expect.poll(async () => Number(
+    await page.getByTestId('tree-ready').getAttribute('data-tree-build-version'),
+  )).toBeGreaterThan(buildVersion);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(treeRow(page, '/first').locator('..')).toHaveClass(/tree-node-selected/);
+  expect(await page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    const editor = (await initMonaco()).editor.getEditors()[0];
+    return editor.getModel().getValueInRange(editor.getSelection());
+  })).toContain('"first": "one"');
 });

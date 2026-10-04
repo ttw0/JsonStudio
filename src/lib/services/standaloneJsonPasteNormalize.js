@@ -1,3 +1,5 @@
+import { isValidJson } from '../utils/jsonBigInt.js';
+
 /**
  * @typedef {{
  *   indent?: number;
@@ -24,10 +26,9 @@ export async function normalizePastedStandaloneJson(sourceValue, options) {
     return await options.formatJson(escapedJson, indent);
   }
 
-  try {
-    JSON.parse(trimmed);
+  if (isValidJson(trimmed)) {
     return await options.formatJson(sourceValue, indent);
-  } catch {
-    return null;
   }
+
+  return null;
 }

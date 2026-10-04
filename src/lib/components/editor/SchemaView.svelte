@@ -6,6 +6,7 @@
   import { generateSchema, validateWithSchema, type SchemaError } from '$lib/services/schema';
   import { fetchRemoteSchema, getRemoteSchemaUrl } from '$lib/services/schemaReference';
   import { t } from '$lib/i18n';
+  import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   type TabMode = 'generate' | 'validate';
 
@@ -31,8 +32,8 @@
 
   let leftContainer: HTMLDivElement;
   let rightContainer: HTMLDivElement;
-  let leftEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
-  let rightEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
+  let leftEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  let rightEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
   let monaco = $state<typeof Monaco | null>(null);
 
   let mode = $state<TabMode>('generate');
@@ -46,6 +47,7 @@
   let remoteSchemaTimer: ReturnType<typeof setTimeout> | null = null;
   let remoteSchemaRequest: AbortController | null = null;
   let copied = $state(false);
+  let destroyed = false;
 
   $effect(() => {
     const val = inputValue;
@@ -53,6 +55,11 @@
       isSyncingLeft = true;
       leftEditor.setValue(val);
       isSyncingLeft = false;
+      if (mode === 'generate') scheduleGenerate(val);
+      else {
+        cancelRemoteSchemaLoad();
+        scheduleReferencedSchemaValidation(val);
+      }
     }
   });
 
@@ -62,9 +69,18 @@
     }
   });
 
+  $effect(() => {
+    leftEditor?.updateOptions({ fontSize, lineHeight });
+    rightEditor?.updateOptions({ fontSize, lineHeight });
+  });
+
   function switchMode(newMode: TabMode) {
     if (mode === newMode) return;
     mode = newMode;
+    if (genTimer) {
+      clearTimeout(genTimer);
+      genTimer = null;
+    }
     schemaError = '';
     validationErrors = [];
     validationValid = null;
@@ -94,7 +110,10 @@
 
   function scheduleGenerate(value: string) {
     if (genTimer) clearTimeout(genTimer);
-    genTimer = setTimeout(() => doGenerate(value), 400);
+    genTimer = setTimeout(() => {
+      genTimer = null;
+      if (!destroyed && mode === 'generate') doGenerate(value);
+    }, 400);
   }
 
   function doGenerate(jsonStr: string) {
@@ -193,6 +212,10 @@
     }
 
     const controller = new AbortController();
+    const sourceModel = leftEditor?.getModel();
+    const sourceVersion = sourceModel?.getVersionId();
+    const targetModel = rightEditor.getModel();
+    const targetVersion = targetModel?.getVersionId();
     remoteSchemaRequest = controller;
     isLoadingRemoteSchema = true;
     schemaError = '';
@@ -201,7 +224,9 @@
 
     try {
       const schema = await fetchRemoteSchema(schemaUrl, { signal: controller.signal });
-      if (controller.signal.aborted || remoteSchemaRequest !== controller) return;
+      if (destroyed || mode !== 'validate' || controller.signal.aborted || remoteSchemaRequest !== controller ||
+        leftEditor?.getModel() !== sourceModel || sourceModel?.getVersionId() !== sourceVersion ||
+        rightEditor.getModel() !== targetModel || targetModel?.getVersionId() !== targetVersion) return;
 
       rightEditor.setValue(schema);
       remoteSchemaUrl = schemaUrl;
@@ -243,11 +268,7 @@
 
   export function minify(): string {
     const value = getValue();
-    try {
-      return JSON.stringify(JSON.parse(value));
-    } catch (_) {
-      return value;
-    }
+    return minifyNumericJson(value);
   }
 
   export function foldAll() {
@@ -264,6 +285,7 @@
 
   onMount(async () => {
     const monacoInstance = await initMonaco();
+    if (destroyed || !leftContainer.isConnected || !rightContainer.isConnected) return;
     monaco = monacoInstance;
     registerMonacoThemes(monacoInstance);
 
@@ -317,6 +339,7 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
     if (genTimer) clearTimeout(genTimer);
     cancelRemoteSchemaLoad();
     leftEditor?.dispose();
@@ -767,15 +790,10 @@
     transition: all 0.15s ease;
   }
 
-  .sv-action-btn:hover:not(:disabled) {
+  .sv-action-btn:hover {
     background: var(--bg-primary);
     border-color: var(--border);
     color: var(--text-primary);
-  }
-
-  .sv-action-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
   }
 
   .sv-action-btn.is-copied {

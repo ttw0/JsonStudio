@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { formatMarkdownTable, formatProperties, parseMarkdownTable, parseProperties } from './convertExtraFormats.js';
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
+import { jsonToYamlPrecise, yamlToJsonPrecise } from './precisionYaml.js';
 
 export type ConvertFormat = 'yaml' | 'xml' | 'toml' | 'csv' | 'properties' | 'ini' | 'markdown';
 
@@ -16,7 +18,7 @@ export const CONVERT_FORMATS: { id: ConvertFormat; label: string; lang: string }
 export async function convertJson(content: string, format: ConvertFormat): Promise<string> {
   switch (format) {
     case 'yaml':
-      return await invoke<string>('json_to_yaml', { content });
+      return jsonToYamlPrecise(content);
     case 'xml':
       return await invoke<string>('json_to_xml', { content });
     case 'toml':
@@ -24,18 +26,18 @@ export async function convertJson(content: string, format: ConvertFormat): Promi
     case 'csv':
       return await invoke<string>('json_to_csv', { content });
     case 'properties':
-      return formatProperties(JSON.parse(content));
+      return formatProperties(parseBigInt(content));
     case 'ini':
-      return formatProperties(JSON.parse(content), { ini: true });
+      return formatProperties(parseBigInt(content), { ini: true });
     case 'markdown':
-      return formatMarkdownTable(JSON.parse(content));
+      return formatMarkdownTable(parseBigInt(content));
   }
 }
 
 export async function convertToJson(content: string, format: ConvertFormat): Promise<string> {
   switch (format) {
     case 'yaml':
-      return await invoke<string>('yaml_to_json', { content });
+      return yamlToJsonPrecise(content);
     case 'xml':
       return await invoke<string>('xml_to_json', { content });
     case 'toml':
@@ -43,10 +45,10 @@ export async function convertToJson(content: string, format: ConvertFormat): Pro
     case 'csv':
       return await invoke<string>('csv_to_json', { content });
     case 'properties':
-      return JSON.stringify(parseProperties(content), null, 2);
+      return stringifyBigInt(parseProperties(content), null, 2);
     case 'ini':
-      return JSON.stringify(parseProperties(content, { ini: true }), null, 2);
+      return stringifyBigInt(parseProperties(content, { ini: true }), null, 2);
     case 'markdown':
-      return JSON.stringify(parseMarkdownTable(content), null, 2);
+      return stringifyBigInt(parseMarkdownTable(content), null, 2);
   }
 }

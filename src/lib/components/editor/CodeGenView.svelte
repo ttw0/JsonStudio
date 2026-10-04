@@ -6,6 +6,7 @@
   import { generateCode, codeToJson, supportsReverse, CODEGEN_LANGUAGES, type CodegenLanguage } from '$lib/services/codegen';
   import { t } from '$lib/i18n';
   import { normalizeLineEndings } from '$lib/services/lineEndings';
+  import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   type Direction = 'json2code' | 'code2json';
 
@@ -43,8 +44,8 @@
 
   let leftContainer: HTMLDivElement;
   let rightContainer: HTMLDivElement;
-  let leftEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
-  let rightEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
+  let leftEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  let rightEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
   let monaco = $state<typeof Monaco | null>(null);
   let selectedLang = $state<CodegenLanguage>('typescript');
   let className = $state('MyModel');
@@ -55,6 +56,7 @@
   let copied = $state(false);
   let isLangDropdownOpen = $state(false);
   let conversionSequence = 0;
+  let destroyed = false;
 
   // Custom Tooltip state and Action
   let tooltipText = $state('');
@@ -140,9 +142,11 @@
     if (direction !== 'json2code') return;
     const val = inputValue;
     if (leftEditor && normalizeLineEndings(val) !== normalizeLineEndings(leftEditor.getValue())) {
+      invalidateConversion();
       isSyncingLeft = true;
       leftEditor.setValue(val);
       isSyncingLeft = false;
+      void doConvert(val);
     }
   });
 
@@ -199,6 +203,7 @@
 
   async function doConvert(content: string) {
     const requestId = ++conversionSequence;
+    if (destroyed) return;
     if (!content.trim()) {
       if (rightEditor) rightEditor.setValue('');
       genError = '';
@@ -209,12 +214,19 @@
     const requestDirection = direction;
     const requestLanguage = selectedLang;
     const requestClassName = className;
+    const sourceModel = leftEditor?.getModel();
+    const sourceVersion = sourceModel?.getVersionId();
+    const targetModel = rightEditor?.getModel();
+    const targetVersion = targetModel?.getVersionId();
+    const isCurrent = () => !destroyed && requestId === conversionSequence &&
+      leftEditor?.getModel() === sourceModel && sourceModel?.getVersionId() === sourceVersion &&
+      rightEditor?.getModel() === targetModel && targetModel?.getVersionId() === targetVersion;
 
     try {
       let result: string;
       if (requestDirection === 'json2code') {
         result = await generateCode(content, requestLanguage, requestClassName);
-        if (requestId !== conversionSequence) return;
+        if (!isCurrent()) return;
         if (rightEditor) {
           const model = rightEditor.getModel();
           if (model) {
@@ -225,7 +237,7 @@
         }
       } else {
         result = await codeToJson(content, requestLanguage);
-        if (requestId !== conversionSequence) return;
+        if (!isCurrent()) return;
         if (rightEditor) {
           const model = rightEditor.getModel();
           if (model) {
@@ -235,7 +247,7 @@
         }
       }
     } catch (e: any) {
-      if (requestId !== conversionSequence) return;
+      if (!isCurrent()) return;
       genError = typeof e === 'string' ? e : e?.message || 'Conversion failed';
       if (rightEditor) rightEditor.setValue('');
     }
@@ -262,7 +274,6 @@
 
   function toggleDirection() {
     if (!canReverse) return;
-    const oldLeft = leftEditor?.getValue() || '';
     const oldRight = rightEditor?.getValue() || '';
 
     invalidateConversion();
@@ -320,11 +331,7 @@
 
   export function minify(): string {
     const value = getValue();
-    try {
-      return JSON.stringify(JSON.parse(value));
-    } catch (_) {
-      return value;
-    }
+    return minifyNumericJson(value);
   }
 
   export function foldAll() {
@@ -349,6 +356,7 @@
     direction = initialDirection;
 
     const monacoInstance = await initMonaco();
+    if (destroyed || !leftContainer.isConnected || !rightContainer.isConnected) return;
     monaco = monacoInstance;
     registerMonacoThemes(monacoInstance);
 
@@ -400,6 +408,7 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
     invalidateConversion();
     onJsonOutputActiveChange(false);
     onJsonContentChange('');
@@ -447,7 +456,7 @@
               </button>
               {#if isLangDropdownOpen}
                 <div class="cg-dropdown-list">
-                  {#each CODEGEN_LANGUAGES as lang}
+                  {#each CODEGEN_LANGUAGES as lang (lang.id)}
                     <button 
                       class="cg-dropdown-item" 
                       class:is-active={selectedLang === lang.id}
@@ -506,7 +515,7 @@
               </button>
               {#if isLangDropdownOpen}
                 <div class="cg-dropdown-list">
-                  {#each CODEGEN_LANGUAGES as lang}
+                  {#each CODEGEN_LANGUAGES as lang (lang.id)}
                     <button 
                       class="cg-dropdown-item" 
                       class:is-active={selectedLang === lang.id}

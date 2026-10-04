@@ -70,7 +70,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Test desktop platform compatibility
-        run: pnpm exec playwright test e2e/windows-compatibility.spec.js
+        run: pnpm exec playwright test e2e/windows-compatibility.spec.js e2e/big-integer-precision.spec.js
 
       - name: Test Rust backend
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib

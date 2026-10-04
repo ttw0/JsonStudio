@@ -6,7 +6,8 @@
   import { initMonaco } from '$lib/services/monaco';
   import { getJson5FoldingRanges } from '$lib/services/json5Folding.js';
   import { registerMonacoThemes, type EditorTheme } from '$lib/config/monacoThemes';
-  import { normalizeLineEndings } from '$lib/services/lineEndings';
+  import { areStringsEqualNormalized } from '$lib/services/lineEndings';
+  import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   // Props
   let {
@@ -25,6 +26,7 @@
     tabSize = 2,
     deferValueSync = false,
     onChange = (value: string) => {},
+    onValueNormalized = onChange,
     onPaste = (_event?: unknown) => {},
   }: {
     value?: string;
@@ -42,6 +44,7 @@
     tabSize?: number;
     deferValueSync?: boolean;
     onChange?: (value: string) => void;
+    onValueNormalized?: (value: string) => void;
     onPaste?: (event?: unknown) => void;
   } = $props();
 
@@ -133,7 +136,7 @@
   }
 
   let container: HTMLDivElement;
-  let editor: Monaco.editor.IStandaloneCodeEditor | null = null;
+  let editor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
   let monaco = $state<typeof Monaco | null>(null);
   const MAX_CACHED_MODELS = 5;
   const modelsByKey = new Map<string, Monaco.editor.ITextModel>();
@@ -145,9 +148,8 @@
   const cursorPositionListeners = new Set<(event: Monaco.editor.ICursorPositionChangedEvent) => void>();
   let cursorPositionDisposable: Monaco.IDisposable | null = null;
   let monacoHoverObserver: MutationObserver | null = null;
+  let destroyed = false;
   
-  // Flag: distinguish between internal edits and external updates
-  let isInternalChange = false;
   const findWidgetManagedHoverSelector = [
     '.workbench-hover-container .monaco-hover',
     '.context-view .monaco-hover',
@@ -187,21 +189,18 @@
   $effect(() => {
     const nextModelKey = modelKey;
     if (editor && monaco && nextModelKey && nextModelKey !== activeModelKey) {
-      isInternalChange = false;
       switchToModel(nextModelKey, value, language);
       return;
     }
 
     if (deferValueSync) return;
 
-    // If change triggered by internal edit, don't update editor
-    if (isInternalChange) {
-      isInternalChange = false;
-      return;
-    }
-
     // Only update the active model when external value actually changes
-    if (editor && normalizeLineEndings(value) !== normalizeLineEndings(editor.getValue())) {
+    if (editor && value !== editor.getValue()) {
+      if (areStringsEqualNormalized(value, editor.getValue())) {
+        syncNormalizedModelValue(value);
+        return;
+      }
       const model = editor.getModel();
       if (model) {
         // Use pushEditOperations instead of setValue to preserve undo history
@@ -223,7 +222,7 @@
       model = monaco.editor.createModel(nextValue, nextLanguage);
     } else {
       modelsByKey.delete(key);
-      if (normalizeLineEndings(model.getValue()) !== normalizeLineEndings(nextValue)) {
+      if (!areStringsEqualNormalized(model.getValue(), nextValue)) {
         model.setValue(nextValue);
       }
       if (model.getLanguageId() !== nextLanguage) {
@@ -244,8 +243,7 @@
     const currentValue = editor?.getValue();
     if (currentValue === undefined || currentValue === expectedValue) return;
     // Monaco strips a leading BOM and normalizes mixed line endings when creating models.
-    isInternalChange = true;
-    onChange(currentValue);
+    onValueNormalized(currentValue);
   }
 
   function disposeUnretainedModels() {
@@ -333,6 +331,7 @@
   onMount(async () => {
     // Use loader to load Monaco (automatically handles worker)
     const monacoInstance = await initMonaco();
+    if (destroyed || !container.isConnected) return;
     monaco = monacoInstance;
     
     // Register custom themes (loaded from config file)
@@ -350,7 +349,6 @@
     });
     
     // Configure JSON language features
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (monacoInstance.languages.json as any).jsonDefaults?.setDiagnosticsOptions({
       validate: true,
       schemaValidation: 'error',
@@ -420,9 +418,11 @@
         if (isSwitchingModel) return;
         const currentValue = editor?.getValue() || '';
         if (currentValue !== value) {
-          // Mark as internal change to avoid triggering $effect to reset value
-          isInternalChange = true;
-          onChange(currentValue);
+          if (areStringsEqualNormalized(currentValue, value)) {
+            onValueNormalized(currentValue);
+          } else {
+            onChange(currentValue);
+          }
         }
       });
 
@@ -447,6 +447,7 @@
   });
   
   onDestroy(() => {
+    destroyed = true;
     editorLinkOpenerDisposable?.dispose();
     editorLinkOpenerDisposable = null;
     cursorPositionDisposable?.dispose();
@@ -530,12 +531,7 @@
   export function minify(): string {
     if (!editor) return '';
     const content = editor.getValue();
-    try {
-      const parsed = JSON.parse(content);
-      return JSON.stringify(parsed);
-    } catch (e) {
-      return content;
-    }
+    return minifyNumericJson(content);
   }
 
   // Monaco Editor native validate function

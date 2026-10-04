@@ -8,6 +8,7 @@
 //
 // This chain is used consistently across format, minify, and validate.
 
+use serde::Serialize;
 use serde_json::Value;
 
 /// Format JSON string (supports JSON5)
@@ -16,13 +17,19 @@ pub fn json_format(content: &str, indent: Option<usize>) -> Result<String, Strin
     let indent_size = indent.unwrap_or(2);
     let value: Value = parse_to_value(content)?;
 
-    let formatted = if indent_size == 0 {
+    if indent_size == 0 {
         serde_json::to_string(&value)
+            .map_err(|e| format!("JSON formatting error: {}", e))
     } else {
-        serde_json::to_string_pretty(&value)
-    };
-
-    formatted.map_err(|e| format!("JSON formatting error: {}", e))
+        let mut buf = Vec::new();
+        let indent_bytes = b" ".repeat(indent_size);
+        let formatter = serde_json::ser::PrettyFormatter::with_indent(&indent_bytes);
+        let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+        value.serialize(&mut ser)
+            .map_err(|e| format!("JSON formatting error: {}", e))?;
+        String::from_utf8(buf)
+            .map_err(|e| format!("UTF-8 conversion error: {}", e))
+    }
 }
 
 /// Minify JSON string (supports JSON5)
@@ -58,10 +65,38 @@ fn parse_to_value(content: &str) -> Result<Value, String> {
         return Ok(v);
     }
     if let Ok(v) = json5::from_str::<Value>(content) {
+        ensure_json5_numeric_precision(&v)?;
         return Ok(v);
     }
     let sanitized = sanitize_json5_special_values(content);
-    json5::from_str::<Value>(&sanitized).map_err(|e| format!("JSON/JSON5 parsing error: {}", e))
+    let value = json5::from_str::<Value>(&sanitized)
+        .map_err(|e| format!("JSON/JSON5 parsing error: {}", e))?;
+    ensure_json5_numeric_precision(&value)?;
+    Ok(value)
+}
+
+fn ensure_json5_numeric_precision(value: &Value) -> Result<(), String> {
+    match value {
+        Value::Number(number) if number.is_f64() => {
+            if let Some(value) = number.as_f64() {
+                if value.abs() > 9_007_199_254_740_991.0 {
+                    return Err("JSON5 numeric value requires lossless normalization to standard JSON".into());
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                ensure_json5_numeric_precision(value)?;
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values() {
+                ensure_json5_numeric_precision(value)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 /// Replace JSON5 special numeric literals (Infinity, -Infinity, +Infinity, NaN)
@@ -180,6 +215,19 @@ fn format_error_description(e: &serde_json::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::json_format;
+
+    #[test]
+    fn native_json_minification_preserves_arbitrary_integers() {
+        for integer in ["9007199254740993".to_string(), "-9223372036854775809".to_string(), "9".repeat(400)] {
+            let source = format!("{{ \"id\": {integer} }}");
+            assert_eq!(super::json_minify(&source).unwrap(), format!("{{\"id\":{integer}}}"));
+        }
+    }
+
+    #[test]
+    fn unsafe_json5_float_fallback_is_rejected_instead_of_rounded() {
+        assert!(super::json_minify("{id:9.007199254740993e15}").is_err());
+    }
 
     #[test]
     fn json_format_preserves_object_key_order() {

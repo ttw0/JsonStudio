@@ -1,3 +1,5 @@
+import { parseNumericLiteral } from '../utils/jsonBigInt.js';
+
 const SOURCE_NODE_MARKER = Symbol.for('jsonstudio.sourceNode');
 const SOURCE_NODE_PROTOTYPE = Object.freeze({
   [SOURCE_NODE_MARKER]: true,
@@ -430,11 +432,8 @@ class JsonSourceParser {
       value = raw.startsWith('-') ? -Infinity : Infinity;
     } else if (/^[+-]?NaN$/.test(raw)) {
       value = NaN;
-    } else if (/^[+-]?0[xX]/.test(raw)) {
-      const sign = raw.startsWith('-') ? -1 : 1;
-      value = sign * Number.parseInt(raw.replace(/^[+-]?0[xX]/, ''), 16);
     } else {
-      value = Number(raw);
+      value = parseNumericLiteral(raw);
     }
 
     return markSourceNode({

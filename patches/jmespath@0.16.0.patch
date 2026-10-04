@@ -1,0 +1,85 @@
+diff --git a/jmespath.js b/jmespath.js
+index 0a3669142d32a97bc58314f3563f2ccf7749e62f..5a43d8a912b69bd92880ac41095248e26f7ddf2b 100644
+--- a/jmespath.js
++++ b/jmespath.js
+@@ -44,7 +44,7 @@
+     }
+     if (isObject(first) === true) {
+       // An object is equal if it has the same key/value pairs.
+-      var keysSeen = {};
++      var keysSeen = Object.create(null);
+       for (var key in first) {
+         if (hasOwnProperty.call(first, key)) {
+           if (strictDeepEqual(first[key], second[key]) === false) {
+@@ -233,7 +233,8 @@
+              ch === "_";
+   }
+ 
+-  function Lexer() {
++  function Lexer(options) {
++    this._parseJSON = options && options.parseJSON || JSON.parse;
+   }
+   Lexer.prototype = {
+       tokenize: function(stream) {
+@@ -437,10 +438,10 @@
+           var literalString = trimLeft(stream.slice(start, this._current));
+           literalString = literalString.replace("\\`", "`");
+           if (this._looksLikeJSON(literalString)) {
+-              literal = JSON.parse(literalString);
++              literal = this._parseJSON(literalString);
+           } else {
+               // Try to JSON parse it as "<literal>"
+-              literal = JSON.parse("\"" + literalString + "\"");
++              literal = this._parseJSON("\"" + literalString + "\"");
+           }
+           // +1 gets us to the ending "`", +1 to move on to the next char.
+           this._current++;
+@@ -500,7 +501,8 @@
+       bindingPower[TOK_LBRACKET] = 55;
+       bindingPower[TOK_LPAREN] = 60;
+ 
+-  function Parser() {
++  function Parser(options) {
++    this._options = options;
+   }
+ 
+   Parser.prototype = {
+@@ -519,7 +521,7 @@
+       },
+ 
+       _loadTokens: function(expression) {
+-          var lexer = new Lexer();
++          var lexer = new Lexer(this._options);
+           var tokens = lexer.tokenize(expression);
+           tokens.push({type: TOK_EOF, value: "", start: expression.length});
+           this.tokens = tokens;
+@@ -1303,6 +1305,7 @@
+             case "[object String]":
+               return TYPE_STRING;
+             case "[object Number]":
++            case "[object BigInt]":
+               return TYPE_NUMBER;
+             case "[object Array]":
+               return TYPE_ARRAY;
+@@ -1653,12 +1656,19 @@
+       return lexer.tokenize(stream);
+   }
+ 
+-  function search(data, expression) {
+-      var parser = new Parser();
++  function search(data, expression, options) {
++      var parser = new Parser(options);
+       // This needs to be improved.  Both the interpreter and runtime depend on
+       // each other.  The runtime needs the interpreter to support exprefs.
+       // There's likely a clean way to avoid the cyclic dependency.
+       var runtime = new Runtime();
++      if (options && options.functions) {
++          Object.keys(options.functions).forEach(function(name) {
++              if (runtime.functionTable[name]) {
++                  runtime.functionTable[name]._func = options.functions[name];
++              }
++          });
++      }
+       var interpreter = new TreeInterpreter(runtime);
+       runtime._interpreter = interpreter;
+       var node = parser.parse(expression);

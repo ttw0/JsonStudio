@@ -1,5 +1,6 @@
 import { camelCase, snakeCase, type PascalCaseOptions } from 'change-case';
 import { parseJsonSourceDocument } from './jsonSourceModel.js';
+import { parseBigInt, stringifyBigInt } from '../utils/jsonBigInt.js';
 
 /**
  * Independent, reusable JSON key naming convention converter.
@@ -71,7 +72,7 @@ export function getOppositeKeyNaming(value: unknown): KeyNaming {
 /** Infer the next naming convention from strict JSON or JSON5/JSONC text. */
 export function getOppositeKeyNamingFromString(jsonString: string): KeyNaming {
   try {
-    return getOppositeKeyNaming(JSON.parse(jsonString));
+    return getOppositeKeyNaming(parseBigInt(jsonString));
   } catch {
     try {
       const parsed = parseJsonSourceDocument(jsonString, {
@@ -127,7 +128,7 @@ export function tryConvertJsonString(
   try {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(jsonString);
+      parsed = parseBigInt(jsonString);
     } catch {
       parsed = parseJsonSourceDocument(jsonString, {
         dialect: 'AUTO',
@@ -135,7 +136,7 @@ export function tryConvertJsonString(
       }).data;
     }
     const converted = convertJsonKeys(parsed, target);
-    return JSON.stringify(converted, null, indent);
+    return stringifyBigInt(converted, null, indent);
   } catch {
     return null;
   }

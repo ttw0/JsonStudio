@@ -5,6 +5,7 @@
   import { registerMonacoThemes, type EditorTheme } from '$lib/config/monacoThemes';
   import { convertJson, convertToJson, CONVERT_FORMATS, type ConvertFormat } from '$lib/services/convert';
   import { t } from '$lib/i18n';
+  import { minifyNumericJson } from '$lib/services/numericNormalize.js';
 
   type Direction = 'json2fmt' | 'fmt2json';
 
@@ -38,8 +39,8 @@
 
   let leftContainer: HTMLDivElement;
   let rightContainer: HTMLDivElement;
-  let leftEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
-  let rightEditor: Monaco.editor.IStandaloneCodeEditor | null = null;
+  let leftEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  let rightEditor = $state.raw<Monaco.editor.IStandaloneCodeEditor | null>(null);
   let monaco = $state<typeof Monaco | null>(null);
   let selectedFormat = $state<ConvertFormat>('yaml');
   let direction = $state<Direction>('json2fmt');
@@ -48,6 +49,7 @@
   let convertTimer: ReturnType<typeof setTimeout> | null = null;
   let copied = $state(false);
   let csvDecorations: Monaco.editor.IEditorDecorationsCollection | null = null;
+  let destroyed = false;
 
   let isFormatDropdownOpen = $state(false);
 
@@ -56,6 +58,7 @@
   }
 
   function selectFormat(fmtId: ConvertFormat) {
+    if (fmtId !== selectedFormat) invalidateConversion();
     selectedFormat = fmtId;
     isFormatDropdownOpen = false;
   }
@@ -189,9 +192,11 @@
     if (direction !== 'json2fmt') return;
     const val = inputValue;
     if (leftEditor && val !== leftEditor.getValue()) {
+      invalidateConversion();
       isSyncingLeft = true;
       leftEditor.setValue(val);
       isSyncingLeft = false;
+      void doConvert(val);
     }
   });
 
@@ -220,6 +225,14 @@
   let pendingDirection: Direction | null = null;
   let conversionSequence = 0;
 
+  function invalidateConversion() {
+    conversionSequence += 1;
+    if (convertTimer) {
+      clearTimeout(convertTimer);
+      convertTimer = null;
+    }
+  }
+
   $effect(() => {
     const fmt = selectedFormat;
     const dir = direction;
@@ -233,12 +246,20 @@
 
   async function doConvert(content: string) {
     const requestId = ++conversionSequence;
+    if (destroyed) return;
     if (!content.trim()) {
       if (rightEditor) rightEditor.setValue('');
       convertError = '';
       return;
     }
     convertError = '';
+    const sourceModel = leftEditor?.getModel();
+    const sourceVersion = sourceModel?.getVersionId();
+    const targetModel = rightEditor?.getModel();
+    const targetVersion = targetModel?.getVersionId();
+    const isCurrent = () => !destroyed && requestId === conversionSequence &&
+      leftEditor?.getModel() === sourceModel && sourceModel?.getVersionId() === sourceVersion &&
+      rightEditor?.getModel() === targetModel && targetModel?.getVersionId() === targetVersion;
 
     try {
       const fmt = selectedFormat;
@@ -246,7 +267,7 @@
 
       if (direction === 'json2fmt') {
         result = await convertJson(content, fmt);
-        if (requestId !== conversionSequence) return;
+        if (!isCurrent()) return;
         if (rightEditor) {
           const model = rightEditor.getModel();
           if (model) {
@@ -264,7 +285,7 @@
         }
       } else {
         result = await convertToJson(content, fmt);
-        if (requestId !== conversionSequence) return;
+        if (!isCurrent()) return;
         if (rightEditor) {
           const model = rightEditor.getModel();
           if (model) {
@@ -278,7 +299,7 @@
         }
       }
     } catch (e: any) {
-      if (requestId !== conversionSequence) return;
+      if (!isCurrent()) return;
       convertError = typeof e === 'string' ? e : e?.message || 'Conversion failed';
       if (rightEditor) rightEditor.setValue('');
     }
@@ -321,17 +342,20 @@
 
   function handleLeftChange(value: string) {
     if (isSyncingLeft) return;
+    invalidateConversion();
     if (direction === 'json2fmt') {
       onInputChange(value);
     }
-    if (convertTimer) clearTimeout(convertTimer);
-    convertTimer = setTimeout(() => doConvert(value), 300);
+    convertTimer = setTimeout(() => {
+      convertTimer = null;
+      void doConvert(value);
+    }, 300);
   }
 
   function toggleDirection() {
-    const oldLeft = leftEditor?.getValue() || '';
     const oldRight = rightEditor?.getValue() || '';
 
+    invalidateConversion();
     direction = direction === 'json2fmt' ? 'fmt2json' : 'json2fmt';
     onJsonOutputActiveChange(direction === 'fmt2json');
 
@@ -399,11 +423,7 @@
 
   export function minify(): string {
     const value = getValue();
-    try {
-      return JSON.stringify(JSON.parse(value));
-    } catch (_) {
-      return value;
-    }
+    return minifyNumericJson(value);
   }
 
   export function foldAll() {
@@ -431,6 +451,7 @@
     selectedFormat = initialFormat;
     direction = initialDirection;
     const monacoInstance = await initMonaco();
+    if (destroyed || !leftContainer.isConnected || !rightContainer.isConnected) return;
     monaco = monacoInstance;
     registerMonacoThemes(monacoInstance);
     registerCsvLanguage(monacoInstance);
@@ -488,8 +509,9 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
+    invalidateConversion();
     document.removeEventListener('click', handleDocumentClick);
-    if (convertTimer) clearTimeout(convertTimer);
     if (scrollFixTimer) clearTimeout(scrollFixTimer);
     onJsonOutputActiveChange(false);
     onJsonContentChange('');
@@ -522,7 +544,7 @@
               </button>
               {#if isFormatDropdownOpen}
                 <div class="cv-dropdown-list">
-                  {#each CONVERT_FORMATS as fmt}
+                  {#each CONVERT_FORMATS as fmt (fmt.id)}
                     <button
                       class="cv-dropdown-item"
                       class:is-active={selectedFormat === fmt.id}
@@ -579,7 +601,7 @@
               </button>
               {#if isFormatDropdownOpen}
                 <div class="cv-dropdown-list">
-                  {#each CONVERT_FORMATS as fmt}
+                  {#each CONVERT_FORMATS as fmt (fmt.id)}
                     <button
                       class="cv-dropdown-item"
                       class:is-active={selectedFormat === fmt.id}

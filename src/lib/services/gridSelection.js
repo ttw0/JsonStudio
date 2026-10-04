@@ -1,3 +1,5 @@
+import { stringifyBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * @typedef {'key' | 'value' | 'row'} GridSelectionTarget
  */
@@ -136,11 +138,11 @@ export function getGridSelectionText(selections, rootValue) {
     .map((selection) => {
       const value = getValueAtPath(rootValue, selection.path);
       if (selection.target === 'value') {
-        return value == null ? String(value) : typeof value === 'object' ? JSON.stringify(value) : String(value);
+        return value == null ? String(value) : typeof value === 'object' ? stringifyBigInt(value) : String(value);
       }
 
       const key = selection.path.split('/').at(-1)?.replaceAll('~1', '/').replaceAll('~0', '~') ?? '';
-      return JSON.stringify({ [key]: value });
+      return stringifyBigInt({ [key]: value });
     })
     .join('\n');
 }

@@ -83,6 +83,11 @@ test('creates tree copy text from the node value source range only', () => {
   ]`);
 });
 
+test('tree copy fallback handles missing values and precise numeric values', () => {
+  assert.equal(createTreeValueCopyText('', {}, '/missing', undefined), 'null');
+  assert.equal(createTreeValueCopyText('', {}, '/id', 9007199254740993n), '9007199254740993');
+});
+
 test('creates tree copy text for absolute node paths', () => {
   const data = {
     world_network: {
@@ -488,7 +493,8 @@ test('tree view wires drag and drop moves through full document writeback', () =
   assert.match(source, /return y < rect\.height \* 0\.5 \? 'before' : 'after'/);
   assert.match(source, /pendingEditKeyPath = result\.editKey \? result\.movedPath : null/);
   assert.match(source, /treeEdit = createTreeKeyEditState\(pendingEditKeyPath\)/);
-  assert.match(source, /editor\?\.setValue\(JSON\.stringify\(result\.data, null, 2\)\)/);
+  assert.match(source, /stringifyBigInt\(result\.data, null, 2\)/);
+  assert.match(source, /editor\?\.setValue\(content\)/);
 });
 
 test('tree view query mode selector opens a custom menu below the control', () => {

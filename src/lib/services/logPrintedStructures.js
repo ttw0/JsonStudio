@@ -1,3 +1,5 @@
+import { parseBigInt, parseNumericLiteral, stringifyBigInt } from '../utils/jsonBigInt.js';
+
 /**
  * Parsers for common language-level debug output embedded in log text.
  * Candidate discovery stays in logJsonFragments.js; this module only converts
@@ -64,7 +66,7 @@ export function formatPrintedStructure(value, indent, kindHint) {
  * @param {PrintedStructureKind} kind
  */
 function formatStructure(value, indent, kind) {
-  return { formatted: JSON.stringify(value, null, indent), kind };
+  return { formatted: stringifyBigInt(value, null, indent), kind };
 }
 
 /**
@@ -96,7 +98,7 @@ function parseJvmEqualsValue(value) {
     return null;
   if (input === 'true') return true;
   if (input === 'false') return false;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
 
   const optional = input.match(/^Optional(?:\.of)?\s*[\[(]([\s\S]*)[\])]$/);
@@ -168,7 +170,7 @@ function parseJavaScriptInspectionValue(value) {
   if (input === 'true') return true;
   if (input === 'false') return false;
   if (input === 'null') return null;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
   if (input.startsWith('{') && input.endsWith('}')) {
     const object = parseKeyValueObject(
@@ -225,7 +227,7 @@ function parseCSharpValue(value) {
   if (input === 'null') return null;
   if (input === 'True' || input === 'true') return true;
   if (input === 'False' || input === 'false') return false;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
   if (input.startsWith('[') && input.endsWith(']')) {
     return splitTopLevel(input.slice(1, -1))
@@ -275,7 +277,7 @@ function parsePythonValue(value) {
   if (input === 'True') return true;
   if (input === 'False') return false;
   if (input === 'None') return null;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
   if (input.startsWith('[') && input.endsWith(']')) {
     return splitTopLevel(input.slice(1, -1))
@@ -304,7 +306,7 @@ function parseRustValue(value) {
   if (input === 'None' || input === '()') return null;
   if (input === 'true') return true;
   if (input === 'false') return false;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
   if (input.startsWith('{') && input.endsWith('}'))
     return parseRustObject(input.slice(1, -1));
@@ -493,7 +495,7 @@ function parseGoValue(value) {
   if (input === 'nil') return null;
   if (input === 'true') return true;
   if (input === 'false') return false;
-  if (isNumericLiteral(input)) return Number(input);
+  if (isNumericLiteral(input)) return parseNumericLiteral(input);
   if (isQuotedValue(input)) return parseQuotedValue(input);
   if (input.startsWith('map[') && input.endsWith(']'))
     return parseGoFields(input.slice(4, -1), 1) ?? input;
@@ -733,7 +735,7 @@ function parseQuotedValue(value) {
   const input = value.trim();
   if (input.startsWith('"')) {
     try {
-      return JSON.parse(input);
+      return parseBigInt(input);
     } catch {
       return input.slice(1, -1);
     }

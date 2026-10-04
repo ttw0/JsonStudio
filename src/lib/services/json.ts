@@ -1,5 +1,6 @@
 // JSON processing service - communicates with Rust backend
 import { invoke } from '@tauri-apps/api/core';
+import { normalizeNumericJsonAsync } from './numericNormalizeWorker.js';
 
 // Validation result type
 export interface ValidationResult {
@@ -23,14 +24,14 @@ export interface JsonStats {
  * Format JSON string
  */
 export async function formatJson(content: string, indent: number = 2): Promise<string> {
-  return await invoke<string>('json_format', { content, indent });
+  return await invoke<string>('json_format', { content: await normalizeNumericJsonAsync(content), indent });
 }
 
 /**
  * Minify JSON string
  */
 export async function minifyJson(content: string): Promise<string> {
-  return await invoke<string>('json_minify', { content });
+  return await invoke<string>('json_minify', { content: await normalizeNumericJsonAsync(content) });
 }
 
 /**

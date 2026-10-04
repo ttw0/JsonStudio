@@ -67,6 +67,102 @@ for (const platform of [
       expect(JSON.parse(state.value)).toEqual(DOCUMENT);
     });
 
+    test('EOL-only file reloads keep source offsets aligned without marking edits', async ({ page }) => {
+      const formatted = JSON.stringify(DOCUMENT, null, 2);
+      await installTauriEditorHarness(page, formatted.replaceAll('\n', platform.eol), {
+        showTreeView: true,
+        filePath: platform.name === 'Windows' ? 'C:\\Data\\data.json' : '/tmp/data.json',
+        fileName: 'data.json',
+      });
+      await page.goto('/');
+      await expect(page.getByTestId('tree-ready')).toBeAttached();
+      await page.evaluate(async value => {
+        const { tabsStore } = await import('/src/lib/stores/tabs.ts');
+        tabsStore.updateTabContent('editor-test-tab', value, false);
+      }, formatted.replaceAll('\n', platform.name === 'Windows' ? '\n' : '\r\n'));
+      await expect.poll(async () => {
+        const state = await editorState(page);
+        return state.document === state.value;
+      }).toBe(true);
+      const row = page.locator('[data-tree-path="/profile/name"]');
+      await row.click();
+      expect((await editorState(page)).selection).toBe('"name": "Alice",');
+      const isModified = await page.evaluate(async () => {
+        const { tabsStore } = await import('/src/lib/stores/tabs.ts');
+        let modified;
+        tabsStore.subscribe(state => {
+          modified = state.tabs.find(tab => tab.id === 'editor-test-tab').isModified;
+        })();
+        return modified;
+      });
+      expect(isModified).toBe(false);
+    });
+
+    test('external edits are not swallowed after a local edit', async ({ page }) => {
+      await openPastedDocument(page);
+      const source = { ...DOCUMENT, first: 'external' };
+      await page.getByTestId('json-editor').locator('.view-lines').click();
+      await page.keyboard.press(platform.name === 'Windows' ? 'Control+End' : 'Meta+ArrowDown');
+      await page.keyboard.insertText(' ');
+      await page.evaluate(async value => {
+        const { tabsStore } = await import('/src/lib/stores/tabs.ts');
+        tabsStore.updateTabContent('editor-test-tab', value, false);
+      }, JSON.stringify(source, null, 2));
+      await expect.poll(async () => JSON.parse((await editorState(page)).value)).toEqual(source);
+      const state = await editorState(page);
+      expect(state.document).toBe(state.value);
+    });
+
+    test('font changes reach editors created by every tool view', async ({ page }) => {
+      await openPastedDocument(page);
+      const fontSizes = () => page.evaluate(async () => {
+        const { initMonaco } = await import('/src/lib/services/monaco.ts');
+        const monaco = await initMonaco();
+        return monaco.editor.getEditors().map(editor =>
+          editor.getOption(monaco.editor.EditorOption.fontInfo).fontSize,
+        );
+      });
+      let size = 18;
+      for (const view of [null, 'Diff', 'Convert', 'Codegen', 'Schema']) {
+        if (view) await page.getByRole('button', { name: view, exact: true }).click();
+        await expect.poll(async () => (await fontSizes()).length).toBe(view ? 2 : 1);
+        await page.evaluate(async value => {
+          const { settingsStore } = await import('/src/lib/stores/settings.ts');
+          settingsStore.updateSetting('fontSize', value);
+        }, size);
+        await expect.poll(fontSizes).toEqual(view ? [size, size] : [size]);
+        if (view) await page.locator('.je-toolbar').getByRole('button', {
+          name: `Exit ${view}`, exact: true,
+        }).click();
+        size += 1;
+      }
+    });
+
+    test('closing a tool before initialization does not leak editors', async ({ page }) => {
+      await page.route('**/src/lib/services/monaco.ts*', async route => {
+        const response = await route.fetch();
+        const body = await response.text();
+        expect(body).toContain('return monacoInitPromise;');
+        await route.fulfill({
+          response,
+          body: body.replace(
+            'return monacoInitPromise;',
+            'return new Promise(resolve => setTimeout(() => resolve(monacoInitPromise), 200));',
+          ),
+        });
+      });
+      await openPastedDocument(page);
+      for (const view of ['Convert', 'Codegen', 'Schema']) {
+        await page.getByRole('button', { name: view, exact: true }).click();
+        await page.locator('.je-toolbar').getByRole('button', {
+          name: `Exit ${view}`, exact: true,
+        }).click();
+        await expect(page.getByTestId('json-editor').locator('.view-lines')).toBeVisible();
+        await expect.poll(async () => (await toolValues(page)).length).toBe(1);
+        expect(JSON.parse((await editorState(page)).value)).toEqual(DOCUMENT);
+      }
+    });
+
     test('Tree selection and edits use the correct character offsets', async ({ page }) => {
       await openPastedDocument(page);
       const row = page.locator('[data-tree-path="/profile/name"]');
@@ -118,6 +214,15 @@ for (const platform of [
       await page.getByTestId('json-editor').locator('.view-lines').click();
       await page.keyboard.press(`${commandKey}+z`);
       await expect.poll(async () => (await editorState(page)).value).toBe(before);
+    });
+
+    test('minification does not round large integer IDs', async ({ page }) => {
+      const source = '{"id":123456789012345678901234567890,"name":"Alice"}';
+      await installTauriEditorHarness(page, `{\n  "id":123456789012345678901234567890,\n  "name":"Alice"\n}`);
+      await page.goto('/');
+      await expect(page.getByTestId('json-editor').locator('.view-lines')).toBeVisible();
+      await page.getByRole('button', { name: 'Minify', exact: true }).click();
+      await expect.poll(async () => (await editorState(page)).value).toBe(source);
     });
 
     test('restored BOM-prefixed content is synchronized before toolbar actions', async ({ page }) => {
@@ -201,6 +306,21 @@ for (const platform of [
       await expect(page.getByTestId('json-editor')).toBeVisible();
       expect(JSON.parse((await editorState(page)).value.split('\r\n')[0])).toEqual({ id: 1, name: 'Alice' });
       await expect(page.getByRole('button', { name: 'Minify', exact: true })).toBeDisabled();
+    });
+
+    test('JSONL can filter and display large integer fields', async ({ page }) => {
+      await installTauriEditorHarness(page, '{"id":9007199254740993,"nested":{"id":123456789012345678901234567890}}', {
+        fileName: 'events.jsonl',
+      });
+      await page.goto('/');
+      const view = page.getByTestId('jsonl-view');
+      await expect(view.locator('.jsonl-item')).toHaveCount(1);
+      await view.getByRole('button', { name: 'Field', exact: true }).click();
+      await view.getByRole('option', { name: 'id', exact: true }).click();
+      await view.getByLabel('Field value').fill('9007199254740993');
+      await expect(view.locator('.jsonl-item')).toHaveCount(1);
+      await view.locator('.jsonl-row-toggle').click();
+      await expect(view.locator('.jsonl-json-number').first()).toHaveText('9007199254740993');
     });
 
     test('caption buttons invoke window commands without starting a drag', async ({ page }) => {
