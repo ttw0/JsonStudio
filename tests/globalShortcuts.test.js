@@ -69,11 +69,14 @@ test('format clipboard delegates JSON normalization to the frontend worker', asy
     new URL('../src-tauri/src/commands/shortcuts.rs', import.meta.url),
     'utf8',
   );
-  const handler = source.match(
-    /pub async fn format_clipboard_and_show[\s\S]*?\n}\n\nfn ensure_window_in_front/,
-  )?.[0] || '';
-  assert.match(handler, /\.emit\("clipboard-content", clipboard_text\)/);
-  assert.doesNotMatch(handler, /serde_json::from_str|serde_json::to_string_pretty/);
+  const lfSource = source.replace(/\r\n?/g, '\n');
+  for (const variant of [lfSource, lfSource.replaceAll('\n', '\r\n')]) {
+    const handler = variant.match(
+      /pub async fn format_clipboard_and_show[\s\S]*?\r?\n}\r?\n\r?\nfn ensure_window_in_front/,
+    )?.[0] || '';
+    assert.match(handler, /\.emit\("clipboard-content", clipboard_text\)/);
+    assert.doesNotMatch(handler, /serde_json::from_str|serde_json::to_string_pretty/);
+  }
 });
 
 test('new and legacy settings default to enabled and retain custom bindings', async () => {
