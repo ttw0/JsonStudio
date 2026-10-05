@@ -105,6 +105,48 @@
   <div class="changelog-container">
     <div class="timeline">
       
+      <!-- v1.5.0 -->
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+        <div class="timeline-header">
+          <span class="timeline-version">v1.5.0</span>
+          <span class="timeline-date">2026-10-05</span>
+        </div>
+        <div class="timeline-body">
+          <h3>新增</h3>
+          <ul>
+            <li><strong>JSONL 与 NDJSON 查看器</strong>：以独立记录视图打开逐行 JSON，支持有效/错误记录统计、全文与字段筛选、分页、展开 JSON 预览和复制原始记录。可切换至源码编辑，保持每行一条记录，不再自动格式化整个文件，并为两种格式提供独立文件关联。</li>
+            <li><strong>远程 JSON Schema 校验</strong>：自动加载文档 <code>$schema</code> 属性声明的 HTTPS Schema，显示加载状态与错误反馈，限制响应大小，并避免编辑后的旧请求结果覆盖当前内容。</li>
+            <li><strong>全局快捷键开关</strong>：可独立启用或禁用系统级快捷键，不影响应用内快捷键。关闭状态重启后仍然生效，保留自定义按键配置，并在注册失败时安全回滚。</li>
+            <li><strong>另存为</strong>：可直接从文件操作菜单将当前文件保存到新的位置。</li>
+          </ul>
+          <h3>改进</h3>
+          <ul>
+            <li><strong>应用更新</strong>：应用运行期间每 12 小时检查更新，同一版本已关闭的提示不再反复弹出；设置按钮显示待更新状态，通知、设置页和 macOS 菜单共享更新与安装状态。</li>
+            <li><strong>转换与代码生成保护</strong>：YAML、XML、Properties、INI 和 Markdown Table 往返转换保留带引号的数字形字符串；目标格式或生成类型无法安全表示整数时明确报错，避免静默丢失精度。</li>
+            <li><strong>编辑器与工具页面流程</strong>：改进新标签页初始化、字体设置传播、缩进设置及异步格式化/转换清理，避免已关闭工具或旧结果覆盖当前编辑，并为工具栏控件补充无障碍标签。</li>
+            <li><strong>双语更新日志页面</strong>：保持中英文发布内容一致，支持窄屏下格式名等行内代码自动换行，避免页面横向溢出。</li>
+            <li><strong>构建、发布与兼容性覆盖</strong>：新增跨平台预览构建，扩展浏览器与原生回归验证，升级 Tauri CLI，补充 Windows/Linux 兼容性文档，规范更新产物 URL，从完整签名的 app 重新制作 macOS 更新归档，并直接从标签对应的 changelog 发布版本说明。</li>
+          </ul>
+          <h3>修复</h3>
+          <ul>
+            <li><strong>大整数精度</strong>：JSON/JSON5 解析、格式化、压缩、键名转换、Tree/Grid 编辑、JSONL/日志查看、格式转换、复制、保存及导出均保留超出 JavaScript 安全范围的整数位数，覆盖 JSON5 十六进制及表示整数的指数形式。</li>
+            <li><strong>查询与 Schema 精确校验</strong>：JMESPath/JSONPath 查询可区分相邻的大整数 ID；数值边界、<code>multipleOf</code>、<code>const</code> 和 <code>enum</code> 校验不再因大整数舍入而产生错误结果。Schema 生成保留整数类型以及 <code>__proto__</code> 等特殊属性名。</li>
+            <li><strong>结构化代码折叠</strong>：主编辑器与 Diff 可完整折叠父对象和数组，覆盖无缩进及同一行开始的嵌套结构；保留共享闭合行的兄弟字段，忽略字符串与注释内的括号，在 Diff 切换焦点或字体时保持折叠状态，并减少长注释行的扫描开销。</li>
+            <li><strong>Windows 与文件编码兼容性</strong>：正确处理 CRLF/混合行尾和带 UTF-8/UTF-16 BOM 的文件，避免源码定位偏移或将未改变的文件误标记为已修改，支持包含空格或 Unicode 的文件路径。</li>
+            <li><strong>XML 往返一致性</strong>：保留空字符串、纯空白字符串、数字形字符串、名为 <code>__text__</code> 的属性，以及被实体或 CDATA 分段的文本。</li>
+            <li><strong>JSON5 Tree 删除</strong>：删除选中节点时正确处理注释和必要分隔符，不再遗留无效尾随逗号或误删相邻节点。</li>
+            <li><strong>macOS 窗口按钮</strong>：稳定缩放窗口和切换主题时红黄绿按钮的位置，减少闪烁和跳动。</li>
+            <li><strong>Windows 更新安装</strong>：采用基础安装界面，提高应用内更新安装的可靠性。</li>
+          </ul>
+          <a href="https://github.com/sundegan/JsonStudio/releases/tag/v1.5.0" target="_blank" class="release-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-right:8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            下载 v1.5.0
+          </a>
+        </div>
+      </div>
+
       <!-- v1.4.0 -->
       <div class="timeline-item">
         <div class="timeline-dot"></div>

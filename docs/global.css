@@ -459,6 +459,11 @@ a:hover{opacity:.85}
   color: var(--text);
 }
 
+.timeline-body code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .release-link {
   display: inline-flex;
   align-items: center;

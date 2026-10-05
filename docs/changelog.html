@@ -105,6 +105,48 @@
   <div class="changelog-container">
     <div class="timeline">
       
+      <!-- v1.5.0 -->
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+        <div class="timeline-header">
+          <span class="timeline-version">v1.5.0</span>
+          <span class="timeline-date">2026-10-05</span>
+        </div>
+        <div class="timeline-body">
+          <h3>Added</h3>
+          <ul>
+            <li><strong>JSONL and NDJSON viewer</strong>: open newline-delimited JSON in a dedicated record view with valid/error counts, full-text and field filters, pagination, expandable JSON previews, and source-row copying. Switch to source editing without automatically reformatting the one-record-per-line content, with dedicated file associations for both formats.</li>
+            <li><strong>Remote JSON Schema validation</strong>: automatically load the HTTPS schema declared by a document's <code>$schema</code> property, with loading/error feedback, response-size limits, and protection against stale results after editing.</li>
+            <li><strong>Global shortcut switch</strong>: enable or disable system-wide shortcuts independently of app-local shortcuts. The disabled state survives restarts, preserves custom bindings, and safely rolls back failed registration changes.</li>
+            <li><strong>Save As</strong>: save the current file to a new location directly from the file actions menu.</li>
+          </ul>
+          <h3>Improved</h3>
+          <ul>
+            <li><strong>Application updates</strong>: check for updates every 12 hours while the app is running, keep dismissed prompts quiet until a different version appears, show pending updates on the settings button, and share update/install state across the notification, settings, and macOS menu.</li>
+            <li><strong>Conversion and code-generation safeguards</strong>: retain quoted numeric-looking strings in YAML, XML, Properties, INI, and Markdown Table round trips; report an explicit error when a target format or generated numeric type cannot represent an integer safely.</li>
+            <li><strong>Editor and tool workflows</strong>: improve new-tab initialization, font-setting propagation, indentation settings, and asynchronous formatting/conversion cleanup so closed tools and outdated results do not overwrite current edits. Add accessible labels to toolbar controls.</li>
+            <li><strong>Bilingual changelog pages</strong>: keep English and Chinese release coverage aligned and allow inline format names to wrap on narrow screens without horizontal overflow.</li>
+            <li><strong>Build, release, and compatibility coverage</strong>: add cross-platform preview builds and broader browser/native regression coverage, update the Tauri CLI, document Windows/Linux compatibility, normalize updater asset URLs, package macOS updater archives from the fully signed app, and publish release notes directly from the tagged changelog.</li>
+          </ul>
+          <h3>Fixed</h3>
+          <ul>
+            <li><strong>Large integer precision</strong>: preserve integer digits beyond JavaScript's safe range across JSON/JSON5 parsing, formatting, minification, key transforms, Tree/Grid edits, JSONL/log inspection, format conversion, copying, saving, and exports, including hexadecimal and integral exponent-form JSON5 values.</li>
+            <li><strong>Exact queries and schema checks</strong>: distinguish adjacent large IDs in JMESPath/JSONPath queries and evaluate numeric bounds, <code>multipleOf</code>, <code>const</code>, and <code>enum</code> without rounding large integers. Schema generation preserves integer types and special property names such as <code>__proto__</code>.</li>
+            <li><strong>Structural code folding</strong>: fold complete parent objects and arrays in the editor and Diff view, including unindented content and scopes starting on the same line. Keep same-line siblings visible, ignore delimiters in strings/comments, retain folds across Diff focus and font changes, and reduce long-comment scanning overhead.</li>
+            <li><strong>Windows and file encoding compatibility</strong>: handle CRLF/mixed line endings and UTF-8/UTF-16 BOM files without corrupting source offsets or falsely marking unchanged files as modified, including file paths containing spaces or Unicode.</li>
+            <li><strong>XML round-trip fidelity</strong>: preserve empty and whitespace-only strings, numeric-looking strings, literal <code>__text__</code> properties, and text split across entities or CDATA.</li>
+            <li><strong>JSON5 Tree deletion</strong>: remove selected nodes with their comments and necessary separators without leaving invalid trailing commas or deleting neighboring entries.</li>
+            <li><strong>macOS window controls</strong>: stabilize native traffic-light positioning during window resizing and theme changes.</li>
+            <li><strong>Windows update installation</strong>: use the basic installer interface for more reliable in-app updates.</li>
+          </ul>
+          <a href="https://github.com/sundegan/JsonStudio/releases/tag/v1.5.0" target="_blank" class="release-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-right:8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            View Release
+          </a>
+        </div>
+      </div>
+
       <!-- v1.4.0 -->
       <div class="timeline-item">
         <div class="timeline-dot"></div>

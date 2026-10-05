@@ -54,6 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.tag_name || github.ref_name }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -121,6 +122,9 @@ jobs:
       - name: Add macOS install guides to DMG
         if: matrix.platform == 'macos-latest'
         shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           BUNDLE_DIR="./src-tauri/target/${{ matrix.target }}/release/bundle"
           APP_PATH="$BUNDLE_DIR/macos/Json Studio.app"
@@ -137,6 +141,12 @@ jobs:
 
           codesign --force --deep --sign - "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+          # Rebuild the updater archive after app signing so it matches the DMG app.
+          UPDATER_ARCHIVE="$APP_PATH.tar.gz"
+          tar -czf "$UPDATER_ARCHIVE" -C "$BUNDLE_DIR/macos" "$(basename "$APP_PATH")"
+          rm -f "$UPDATER_ARCHIVE.sig"
+          pnpm tauri signer sign "$UPDATER_ARCHIVE" --app-version "${VERSION#v}"
 
           mkdir -p "$DMG_ROOT" "$BUNDLE_DIR/dmg"
           cp -R "$APP_PATH" "$DMG_ROOT/"
@@ -375,6 +385,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag_name || github.ref_name }}
+
       - name: Download release files
         uses: actions/download-artifact@v4
         with:
@@ -437,20 +452,41 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
 
+      - name: Generate release notes
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const tag = process.env.RELEASE_TAG;
+          const version = tag.replace(/^v/, '');
+          const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+          const section = changelog.split(/^## /m)
+            .find((entry) => entry.startsWith(`[${version}] - `));
+          if (!section) {
+            throw new Error(`No changelog entry found for ${tag}`);
+          }
+
+          const installationNotes = [
+            '### Installation',
+            '- Windows: use the `windows_x64-portable.zip` package for a no-install version, or run the setup installer.',
+            '- macOS: open the DMG for your architecture and drag `Json Studio.app` into Applications. These builds are not Apple Developer ID notarized; macOS may require right-click Open or confirmation in System Settings > Privacy & Security.',
+          ].join('\n');
+          fs.writeFileSync(
+            'dist/release-notes.md',
+            `## ${section.trim()}\n\n${installationNotes}\n`
+          );
+          NODE
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2.6.2
         with:
           files: dist/release/*
           tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           name: 'Json Studio ${{ github.event.inputs.tag_name || github.ref_name }}'
-          body: |
-            View changelog: https://github.com/${{ github.repository }}/CHANGELOG.md
-
-            Auto-update metadata is published as `latest.json` for the Tauri updater.
-
-            Windows note: download the `windows_x64-portable.zip` package for a no-install version. Unzip it and run `Json Studio.exe` directly.
-
-            macOS note: download the DMG for your Mac architecture, open it, then drag `Json Studio.app` into Applications. These builds are not Apple Developer ID notarized, so macOS may ask you to confirm the first launch via right-click Open or System Settings > Privacy & Security.
+          body_path: dist/release-notes.md
           draft: false
           prerelease: false
           fail_on_unmatched_files: true

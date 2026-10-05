@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## [1.5.0] - 2026-10-05
+
+### Added
+- **JSONL and NDJSON viewer**: open newline-delimited JSON in a dedicated record view with valid/error counts, full-text and field filters, pagination, expandable JSON previews, and source-row copying. Switch to source editing without automatically reformatting the one-record-per-line content, with dedicated file associations for both formats.
+- **Remote JSON Schema validation**: automatically load the HTTPS schema declared by a document's `$schema` property, with loading/error feedback, response-size limits, and protection against stale results after editing.
+- **Global shortcut switch**: enable or disable system-wide shortcuts independently of app-local shortcuts. The disabled state survives restarts, preserves custom bindings, and safely rolls back failed registration changes.
+- **Save As**: save the current file to a new location directly from the file actions menu.
+
+### Improved
+- **Application updates**: check for updates every 12 hours while the app is running, keep dismissed prompts quiet until a different version appears, show pending updates on the settings button, and share update/install state across the notification, settings, and macOS menu.
+- **Conversion and code-generation safeguards**: retain quoted numeric-looking strings in YAML, XML, Properties, INI, and Markdown Table round trips; report an explicit error when a target format or generated numeric type cannot represent an integer safely.
+- **Editor and tool workflows**: improve new-tab initialization, font-setting propagation, indentation settings, and asynchronous formatting/conversion cleanup so closed tools and outdated results do not overwrite current edits. Add accessible labels to toolbar controls.
+- **Bilingual changelog pages**: keep English and Chinese release coverage aligned and allow inline format names to wrap on narrow screens without horizontal overflow.
+- **Build, release, and compatibility coverage**: add cross-platform preview builds and broader browser/native regression coverage, update the Tauri CLI, document Windows/Linux compatibility, normalize updater asset URLs, package macOS updater archives from the fully signed app, and publish release notes directly from the tagged changelog.
+
+### Fixed
+- **Large integer precision**: preserve integer digits beyond JavaScript's safe range across JSON/JSON5 parsing, formatting, minification, key transforms, Tree/Grid edits, JSONL/log inspection, format conversion, copying, saving, and exports, including hexadecimal and integral exponent-form JSON5 values.
+- **Exact queries and schema checks**: distinguish adjacent large IDs in JMESPath/JSONPath queries and evaluate numeric bounds, `multipleOf`, `const`, and `enum` without rounding large integers. Schema generation preserves integer types and special property names such as `__proto__`.
+- **Structural code folding**: fold complete parent objects and arrays in the editor and Diff view, including unindented content and scopes starting on the same line. Keep same-line siblings visible, ignore delimiters in strings/comments, retain folds across Diff focus and font changes, and reduce long-comment scanning overhead.
+- **Windows and file encoding compatibility**: handle CRLF/mixed line endings and UTF-8/UTF-16 BOM files without corrupting source offsets or falsely marking unchanged files as modified, including file paths containing spaces or Unicode.
+- **XML round-trip fidelity**: preserve empty and whitespace-only strings, numeric-looking strings, literal `__text__` properties, and text split across entities or CDATA.
+- **JSON5 Tree deletion**: remove selected nodes with their comments and necessary separators without leaving invalid trailing commas or deleting neighboring entries.
+- **macOS window controls**: stabilize native traffic-light positioning during window resizing and theme changes.
+- **Windows update installation**: use the basic installer interface for more reliable in-app updates.
+
 ## [1.4.0] - 2026-07-21
 
 ### Added
