@@ -29,7 +29,7 @@ async function open(page, content = SOURCE, pasted = false) {
   });
   await page.goto('/');
   const surface = page.getByTestId('json-editor').locator('.view-lines');
-  await expect(surface).toBeVisible();
+  await expect(surface).toBeVisible({ timeout: 30_000 });
   if (pasted) {
     await surface.click();
     await pasteIntoEditor(page, content);

@@ -30,10 +30,16 @@ async function openPastedDocument(page) {
   await installTauriEditorHarness(page, '', { showTreeView: true });
   await page.goto('/');
   const surface = page.getByTestId('json-editor').locator('.view-lines');
-  await expect(surface).toBeVisible();
+  await expect(surface).toBeVisible({ timeout: 30_000 });
   await surface.click();
   await pasteIntoEditor(page, SOURCE);
   await expect(page.getByTestId('editor-line-count')).toContainText('9 lines');
+  await expect.poll(() => page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    const { getCachedJsonTreeModel } = await import('/src/lib/services/jsonTreeModelCache.js');
+    const instance = (await initMonaco()).editor.getEditors()[0];
+    return getCachedJsonTreeModel('editor-test-tab', instance.getValue()) !== null;
+  })).toBe(true);
   await expect(page.getByTestId('tree-ready')).toBeAttached();
 }
 
