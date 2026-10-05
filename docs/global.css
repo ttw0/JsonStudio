@@ -103,6 +103,7 @@ a:hover{opacity:.85}
 
 /* ── Hero ── */
 .hero{padding:140px 24px 60px;text-align:center;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center}
+.hero.install-hero{overflow:clip}
 .hero::before{content:'';position:absolute;top:-300px;left:50%;transform:translateX(-50%);width:1000px;height:1000px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 65%);pointer-events:none}
 .hero-icon{display:block;width:96px;height:96px;border-radius:24px;margin:0 0 32px;position:relative;box-shadow:0 0 80px rgba(245,197,66,.2),0 0 0 1px rgba(245,197,66,.15);animation:float 6s ease-in-out infinite}
 @keyframes float {
@@ -121,12 +122,18 @@ a:hover{opacity:.85}
 .btn-outline{display:inline-flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-weight:600;font-size:16px;padding:14px 32px;border-radius:14px;transition:all .3s cubic-bezier(0.16, 1, 0.3, 1)}
 .btn-outline:hover{border-color:var(--accent);background:var(--accent-glow);transform:translateY(-3px);opacity:1}
 .btn-primary svg,.btn-outline svg{width:18px;height:18px}
-.install-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:22px;padding:8px 8px 8px 14px;border:1px solid rgba(245,197,66,.22);border-radius:14px;background:linear-gradient(180deg,rgba(21,21,34,.84),rgba(10,10,16,.92));color:var(--text2);position:relative;animation:fadeInUp .8s cubic-bezier(0.16,1,0.3,1) .4s both;max-width:min(100%,560px);box-shadow:0 18px 54px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.install-options{width:min(100%,680px);min-width:0;margin:22px auto 0;position:relative}
+.install-methods{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.install-methods button{flex:1;min-width:max-content;min-height:42px;padding:9px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);font:inherit;font-size:13px;font-weight:600;letter-spacing:0;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s}
+.install-methods button:hover{color:var(--text);background:var(--bg3);border-color:var(--accent)}
+.install-methods button[aria-pressed="true"]{color:#111827;background:var(--accent2);border-color:var(--accent2);box-shadow:0 2px 6px rgba(245,158,11,.22)}
+.install-methods button:focus-visible,.install-copy:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.install-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;min-height:68px;padding:8px 8px 8px 14px;border:1px solid rgba(245,197,66,.22);border-radius:8px;background:linear-gradient(180deg,rgba(21,21,34,.84),rgba(10,10,16,.92));color:var(--text2);position:relative;animation:fadeInUp .8s cubic-bezier(0.16,1,0.3,1) .4s both;box-shadow:0 18px 54px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .install-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,rgba(245,197,66,.12),transparent 32%,rgba(59,130,246,.08));pointer-events:none}
 :root[data-theme="light"] .install-card{background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(248,250,252,.86));box-shadow:0 18px 48px rgba(15,23,42,.12),inset 0 1px 0 rgba(255,255,255,.7)}
-.install-card code{font-family:'SFMono-Regular','Cascadia Code','JetBrains Mono',Monaco,Consolas,monospace;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;text-align:left}
+.install-card code{font-family:'SFMono-Regular','Cascadia Code','JetBrains Mono',Monaco,Consolas,monospace;font-size:13px;color:var(--text);white-space:normal;overflow-wrap:anywhere;position:relative;text-align:left;line-height:1.6}
 .install-card .prompt{color:var(--accent);font-weight:700}
-.install-copy{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:10px;border:1px solid rgba(245,197,66,.22);background:var(--accent-glow);color:var(--accent);font:inherit;cursor:pointer;position:relative;transition:all .2s}
+.install-copy{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:6px;border:1px solid rgba(245,197,66,.22);background:var(--accent-glow);color:var(--accent);font:inherit;cursor:pointer;position:relative;transition:all .2s}
 .install-copy:hover{border-color:rgba(245,197,66,.5);background:rgba(245,197,66,.14);transform:translateY(-1px)}
 .install-copy svg{width:14px;height:14px}
 .install-copy .copied-icon{display:none}
@@ -359,8 +366,9 @@ a:hover{opacity:.85}
   .positioning-card.is-wide{grid-column:auto}
   .hero-actions{flex-direction:column;align-items:stretch;width:100%;max-width:320px;margin:0 auto;}
   .btn-primary, .btn-outline {justify-content: center;}
-  .install-card{grid-template-columns:1fr;align-items:stretch;width:100%;max-width:320px;text-align:left;gap:10px;padding:12px}
-  .install-card code{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .install-methods{gap:6px}
+  .install-methods button{min-height:44px;padding:9px 4px}
+  .install-card{grid-template-columns:minmax(0,1fr) auto;width:100%;min-height:112px;text-align:left;gap:10px;padding:12px}
   .footer-inner{flex-direction:column;text-align:center}
   .nav-link{display:none}
   .comparison th,.comparison td{padding:12px 14px;font-size:13px}

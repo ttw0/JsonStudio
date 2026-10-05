@@ -1,0 +1,25 @@
+name: Publish npm installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with trusted publishing support
+        run: npm install -g npm@11
+      - name: Test installer
+        run: node --test tests/installer.test.js
+      - name: Publish using the configured npm trusted publisher
+        working-directory: packages/installer
+        run: npm publish --access public --provenance

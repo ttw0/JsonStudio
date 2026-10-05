@@ -25,7 +25,7 @@ If you like JsonStudio, please give it a star [⭐](https://github.com/sundegan/
 ## Preview
 
 <p align="center">
-  <a href="https://jsonstudio.js.org/">
+  <a href="https://jsonstudio.js.org/#screenshots">
     <img src="docs/media/jsonstudio-demo.gif" width="900" alt="JsonStudio demo showing clipboard formatting, Tree View editing and drag-and-drop, Grid View editing, and log JSON extraction">
   </a>
 </p>
@@ -34,40 +34,64 @@ If you like JsonStudio, please give it a star [⭐](https://github.com/sundegan/
 
 ## What Makes It Different
 
-JsonStudio is built for JSON in real development work: API requests and responses, deeply nested data, escaped strings, JSON5-like snippets, and log lines where plain text and JSON are mixed together.
+JsonStudio is built for JSON in real development work: API requests and responses, deeply nested data, escaped strings, JSON5-like snippets, JSONL/NDJSON, and log lines where plain text and JSON are mixed together.
 
-- **Local-first**: works offline and keeps sensitive JSON on your machine.
-- **Flexible input**: handles standard JSON, JSON5-like snippets, escaped JSON strings, repairable fragments, and mixed log text.
+- **Local-first**: works offline, offers convenient keyboard shortcuts, and keeps sensitive data on your machine.
+- **Flexible input**: handles standard JSON, JSON5-like snippets, escaped JSON strings, repairable JSON fragments, JSONL/NDJSON, and mixed log text.
 - **Visual editing**: edit and reorganize data in Tree View, or inspect arrays in Grid View.
 - **Daily tools in one place**: query, diff, convert, validate with schema, and generate typed code.
 - **Desktop workflow**: multi-tabs, file drag-and-drop, format clipboard, shortcuts, unsaved-change prompts, and optional auto-save.
 
 ## Why JsonStudio? (vs Online Tools)
 
-| Capability | Online Tools | JsonStudio |
-|---|---:|---:|
-| Offline / no internet required | ❌ | ✅ |
-| Large JSON data performance | ❌ | ✅ |
-| Multi-tab editing | ❌ | ✅ |
-| Editable Tree View & Grid View, with drag-and-drop | ❌ | ✅ |
-| Log-like text JSON extraction | ❌ | ✅ |
-| JSON5 parsing and formatting | ❌ | ✅ |
-| Auto-save and reusable file tabs | ❌ | ✅ |
-| Global shortcuts & custom keybindings | ❌ | ✅ |
-| Local file operations | ❌ | ✅ |
-| Custom settings for theme, font, spacing, and shortcuts | ❌ | ✅ |
+| Capability                                              | Online Tools | JsonStudio |
+| ------------------------------------------------------- | -----------: | ---------: |
+| Offline / no internet required                          |           ❌ |         ✅ |
+| Large JSON data performance                             |           ❌ |         ✅ |
+| Multi-tab editing                                       |           ❌ |         ✅ |
+| Editable Tree View & Grid View, with drag-and-drop      |           ❌ |         ✅ |
+| Log-like text JSON extraction                           |           ❌ |         ✅ |
+| JSON5 parsing and formatting                            |           ❌ |         ✅ |
+| JSONL file viewing                                      |           ❌ |         ✅ |
+| Auto-save and reusable file tabs                        |           ❌ |         ✅ |
+| Global shortcuts & custom keybindings                   |           ❌ |         ✅ |
+| Local file operations                                   |           ❌ |         ✅ |
+| Custom settings for theme, font, spacing, and shortcuts |           ❌ |         ✅ |
 
 ## Download
 
-Download the latest installer from [GitHub Releases](https://github.com/sundegan/JsonStudio/releases).
+Download the installer for your platform from [GitHub Releases](https://github.com/sundegan/JsonStudio/releases), or install from the command line:
 
-### Homebrew (macOS)
+1. Homebrew (macOS)
 
 ```sh
 brew install --cask sundegan/tap/json-studio
 ```
 
-### macOS
+2. curl (macOS and Linux)
+
+```sh
+curl -fsSL https://jsonstudio.js.org/install.sh | sh
+```
+
+3. PowerShell (Windows)
+
+```powershell
+irm https://jsonstudio.js.org/install.ps1 | iex
+```
+
+4. npm (macOS, Windows and Linux)
+
+Requires Node.js 20 or later:
+
+```sh
+# Option 1
+npx --yes @sundegan/jsonstudio install
+# Option 2
+npm install -g @sundegan/jsonstudio
+```
+
+### macOS Notes
 
 1. Download the DMG for your Mac architecture (`aarch64` for Apple Silicon, `x64` for Intel).
 2. Open the DMG and drag `Json Studio.app` into Applications.

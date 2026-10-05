@@ -72,6 +72,9 @@ jobs:
       - name: Test desktop platform compatibility
         run: pnpm exec playwright test e2e/windows-compatibility.spec.js e2e/big-integer-precision.spec.js e2e/editor-folding.spec.js
 
+      - name: Test installation website
+        run: pnpm exec playwright test --config playwright.installers.config.js
+
       - name: Test Rust backend
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
@@ -81,7 +84,7 @@ jobs:
       - name: Build Tauri app (build only, no upload)
         run: |
           if [ "${{ matrix.platform }}" == "macos-latest" ]; then
-            # macOS: build the .app, then package our own drag-and-drop DMG with install guides.
+            # macOS: build the .app, then package our own drag-and-drop DMG.
             pnpm tauri build ${{ matrix.args }} --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
           else
             # Other platforms: normal build
@@ -89,7 +92,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Add macOS install guides to DMG
+      - name: Package macOS drag-and-drop DMG
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |

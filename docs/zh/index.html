@@ -156,7 +156,7 @@
   </nav>
 
   <!-- Hero -->
-  <section class="hero">
+  <section class="hero install-hero">
     <img src="../icon.png" alt="JsonStudio" class="hero-icon">
     <div class="hero-kicker">专业级桌面 JSON 工作站</div>
     <h1><span class="gold">Json</span>Studio</h1>
@@ -179,8 +179,19 @@
         <span>查看 GitHub</span>
       </a>
     </div>
-    <div class="install-card" aria-label="使用 Homebrew 安装 JsonStudio">
-      <code><span class="prompt">$</span> brew install --cask sundegan/tap/json-studio</code>
+    <div class="install-options">
+      <div class="install-methods" role="group" aria-label="安装方式">
+        <button type="button" data-install-method="curl" aria-pressed="false" title="macOS 和 Linux"
+          data-command="curl -fsSL https://jsonstudio.js.org/install.sh | sh">curl</button>
+        <button type="button" data-install-method="powershell" aria-pressed="false" title="Windows"
+          data-command="irm https://jsonstudio.js.org/install.ps1 | iex">PowerShell</button>
+        <button type="button" data-install-method="npm" aria-pressed="false" title="三个平台 · 需要 Node.js 20 或以上版本"
+          data-command="npx --yes @sundegan/jsonstudio install">npm</button>
+        <button type="button" data-install-method="brew" aria-pressed="true" title="macOS"
+          data-command="brew install --cask sundegan/tap/json-studio">Homebrew</button>
+      </div>
+    <div class="install-card" aria-label="安装 JsonStudio">
+      <code><span class="prompt">$</span> <span data-install-command-text>brew install --cask sundegan/tap/json-studio</span></code>
       <button class="install-copy" type="button" data-copy-command="brew install --cask sundegan/tap/json-studio"
         data-default-label="复制命令" data-copied-label="已复制" aria-label="复制 Homebrew 安装命令" title="复制命令">
         <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -193,6 +204,7 @@
           <path d="M20 6 9 17l-5-5" />
         </svg>
       </button>
+    </div>
     </div>
   </section>
 
@@ -283,12 +295,12 @@
         <div class="showcase-text">
           <span class="showcase-badge green">编辑器</span>
           <h3>专业级 JSON 格式化与美化工具</h3>
-          <p>基于 Monaco Editor（VS Code 编辑器内核）打造，提供顶级的 JSON/JSON5 格式化、美化与查看体验。</p>
+          <p>基于 Monaco Editor（VS Code 编辑器内核）打造，提供顶级的 JSON/JSON5/JSONL 格式化、美化与查看体验。</p>
           <ul>
             <li>语法高亮与括号对着色</li>
             <li>多标签页编辑，支持拖拽排序</li>
             <li>代码折叠、缩略图和查找替换</li>
-            <li>粘贴自动识别 JSON、JSON5、转义 JSON 并格式化</li>
+            <li>粘贴自动识别 JSON、JSON5、JSONL、转义 JSON 并格式化</li>
             <li>默认保留对象 key 原始顺序，格式化结果更贴近源数据</li>
             <li>明暗模式切换 + 10+ 配色主题，包括 Dracula、Nord、One Dark</li>
           </ul>
@@ -795,47 +807,6 @@
       applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
     });
 
-    document.querySelectorAll('.install-copy').forEach(button => {
-      const defaultLabel = button.dataset.defaultLabel || '复制命令';
-      const copiedLabel = button.dataset.copiedLabel || '已复制';
-
-      button.addEventListener('click', async () => {
-        try {
-          const command = button.dataset.copyCommand || '';
-          let copied = false;
-          if (navigator.clipboard?.writeText) {
-            try {
-              await navigator.clipboard.writeText(command);
-              copied = true;
-            } catch { }
-          }
-          if (!copied) {
-            const textarea = document.createElement('textarea');
-            textarea.value = command;
-            textarea.setAttribute('readonly', '');
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            textarea.remove();
-          }
-          button.classList.add('is-copied');
-          button.setAttribute('aria-label', copiedLabel);
-          button.setAttribute('title', copiedLabel);
-          window.setTimeout(() => {
-            button.classList.remove('is-copied');
-            button.setAttribute('aria-label', defaultLabel);
-            button.setAttribute('title', defaultLabel);
-          }, 1600);
-        } catch {
-          button.classList.remove('is-copied');
-          button.setAttribute('aria-label', defaultLabel);
-          button.setAttribute('title', defaultLabel);
-        }
-      });
-    });
-
     document.querySelectorAll('.showcase-visual img, .screenshot-box img').forEach(img => {
       img.addEventListener('click', () => {
         modal.style.display = 'flex';
@@ -856,6 +827,7 @@
       if (e.key === 'Escape') closeModal();
     });
   </script>
+  <script src="../install-options.js" defer></script>
 </body>
 
 </html>

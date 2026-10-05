@@ -1,0 +1,25 @@
+{
+  "name": "@sundegan/jsonstudio",
+  "version": "0.1.0",
+  "description": "Cross-platform installer and launcher for the JsonStudio desktop app",
+  "license": "Apache-2.0",
+  "author": "sundegan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sundegan/JsonStudio.git",
+    "directory": "packages/installer"
+  },
+  "homepage": "https://jsonstudio.js.org",
+  "bin": {
+    "jsonstudio": "bin/jsonstudio.cjs"
+  },
+  "files": ["bin/", "dist/", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "prepack": "node prepare.cjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
+}

@@ -34,40 +34,64 @@
 
 ## JsonStudio 的特点
 
-JsonStudio 面向真实开发场景里的 JSON —— 接口请求/响应、复杂嵌套数据、转义字符串、类 JSON/JSON5 片段，以及普通日志文本和 JSON 混在一起的内容。
+JsonStudio 面向真实开发场景里的 JSON —— 接口请求/响应、复杂嵌套数据、转义字符串、类 JSON/JSON5 片段、JSONL/NDJSON，以及普通日志文本和 JSON 混在一起的内容。
 
-- **本地优先**：离线可用，敏感 JSON 不离开本机。
-- **输入更灵活**：支持标准 JSON、类 JSON/JSON5、转义 JSON、可修复片段，以及日志混合文本。
+- **本地优先**：离线可用，便捷的快捷键操作，敏感数据不离开本机。
+- **输入更灵活**：支持标准 JSON、类 JSON/JSON5、转义 JSON、可修复JSON片段、JSONL/NDJSON，以及日志混合文本。
 - **可视化编辑**：在树视图中编辑和调整结构，也可以用 Grid 网格视图查看数组。
 - **常用工具集中**：查询、对比、格式转换、Schema 校验、类型代码生成一站完成。
 - **桌面文件体验**：多标签、拖拽打开、格式化剪贴板、快捷键、未保存提示和可选自动保存。
 
 ## 为什么选择 JsonStudio（对比在线工具）
 
-| 能力 | 在线工具 | JsonStudio |
-|---|---:|---:|
-| 离线使用 / 无需联网 | ❌ | ✅ |
-| 大 JSON 数据性能 | ❌ | ✅ |
-| 多标签页编辑 | ❌ | ✅ |
-| 可编辑、可拖拽的树视图与可编辑 Grid 网格视图 | ❌ | ✅ |
-| 日志混合文本 JSON 提取 | ❌ | ✅ |
-| JSON5 解析与格式化 | ❌ | ✅ |
-| 文件自动保存与标签页复用 | ❌ | ✅ |
-| 全局快捷键与自定义键绑定 | ❌ | ✅ |
-| 本地文件操作 | ❌ | ✅ |
-| 自定义设置（主题、字号、间距、快捷键等） | ❌ | ✅ |
+| 能力                                         | 在线工具 | JsonStudio |
+| -------------------------------------------- | -------: | ---------: |
+| 离线使用 / 无需联网                          |       ❌ |         ✅ |
+| 大 JSON 数据性能                             |       ❌ |         ✅ |
+| 多标签页编辑                                 |       ❌ |         ✅ |
+| 可编辑、可拖拽的树视图与可编辑 Grid 网格视图 |       ❌ |         ✅ |
+| 日志混合文本 JSON 提取                       |       ❌ |         ✅ |
+| JSON5 解析与格式化                           |       ❌ |         ✅ |
+| JSONL 文件查看                               |       ❌ |         ✅ |
+| 文件自动保存与标签页复用                     |       ❌ |         ✅ |
+| 全局快捷键与自定义键绑定                     |       ❌ |         ✅ |
+| 本地文件操作                                 |       ❌ |         ✅ |
+| 自定义设置（主题、字号、间距、快捷键等）     |       ❌ |         ✅ |
 
 ## 下载
 
-前往 [GitHub Releases](https://github.com/sundegan/JsonStudio/releases) 下载对应平台安装包。
+前往 [GitHub Releases](https://github.com/sundegan/JsonStudio/releases) 下载对应平台安装包。或者使用命令进行安装：
 
-### Homebrew（macOS）
+1. Homebrew（macOS）
 
 ```sh
 brew install --cask sundegan/tap/json-studio
 ```
 
-### macOS
+2. Curl（macOS 和 Linux）
+
+```sh
+curl -fsSL https://jsonstudio.js.org/install.sh | sh
+```
+
+3. PowerShell（Windows）
+
+```powershell
+irm https://jsonstudio.js.org/install.ps1 | iex
+```
+
+4. npm（macOS、Windows 和 Linux）
+
+需要 Node.js 20 或以上版本：
+
+```sh
+# 方式1
+npx --yes @sundegan/jsonstudio install
+# 方式2
+npm install -g @sundegan/jsonstudio
+```
+
+### macOS注意事项
 
 1. 下载适合你设备架构的 DMG（Apple Silicon 选 `aarch64`，Intel Mac 选 `x64`）。
 2. 打开 DMG，将 `Json Studio.app` 拖入“应用程序”文件夹。

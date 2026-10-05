@@ -1,0 +1,41 @@
+name: Publish installer checksums
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Existing release tag (leave empty to use the latest stable release)'
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  checksums:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download existing installers and publish SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          if [ -z "$tag" ]; then
+            tag="$(gh release view --json tagName --jq .tagName)"
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid stable release tag"; exit 1; }
+          gh release download "$tag" --dir dist/install-checksums \
+            --pattern '*_linux_amd64.AppImage' \
+            --pattern '*_macos_aarch64.app.tar.gz' \
+            --pattern '*_macos_x64.app.tar.gz' \
+            --pattern '*_windows_x64-setup.exe'
+          node scripts/generate-install-checksums.mjs dist/install-checksums "$tag"
+          gh release upload "$tag" dist/install-checksums/SHA256SUMS --clobber

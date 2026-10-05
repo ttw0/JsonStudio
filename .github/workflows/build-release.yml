@@ -119,7 +119,7 @@ jobs:
             pnpm tauri build ${{ matrix.args }}
           fi
 
-      - name: Add macOS install guides to DMG
+      - name: Package macOS drag-and-drop DMG
         if: matrix.platform == 'macos-latest'
         shell: bash
         env:
@@ -479,6 +479,19 @@ jobs:
             `## ${section.trim()}\n\n${installationNotes}\n`
           );
           NODE
+
+      - name: Checkout installer tooling from the workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .installer-tooling
+          sparse-checkout: scripts/generate-install-checksums.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Generate installer checksums
+        run: node .installer-tooling/scripts/generate-install-checksums.mjs dist/release "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2.6.2
