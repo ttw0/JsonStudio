@@ -32,3 +32,19 @@ test('the English homepage includes the JSONL editor updates from the Chinese ho
   assert.match(english, /pasted JSON, JSON5, JSONL, and escaped JSON/);
   assert.match(chinese, /JSON、JSON5、JSONL、转义 JSON/);
 });
+
+test('both homepage comparison tables include JSONL file viewing', async () => {
+  for (const [file, label] of [
+    ['docs/index.html', 'JSONL File Viewing'],
+    ['docs/zh/index.html', 'JSONL 文件查看'],
+  ]) {
+    const html = await read(file);
+    const comparison = html.match(/<section[^>]*id="compare"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    assert.ok(comparison, `${file} must have a comparison section`);
+    const rows = Array.from(comparison.matchAll(/<tr>([\s\S]*?)<\/tr>/g));
+    const row = rows.find(match => match[1].includes(`<td>${label}</td>`));
+    assert.ok(row, `${file} must compare JSONL file viewing`);
+    assert.match(row[1], /<td class="cross">✗<\/td>/);
+    assert.match(row[1], /<td class="check highlight">✓<\/td>/);
+  }
+});
