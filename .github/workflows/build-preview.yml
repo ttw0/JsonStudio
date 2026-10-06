@@ -50,6 +50,9 @@ jobs:
         shell: bash
         run: pnpm tauri build --target x86_64-pc-windows-msvc --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
+      - name: Verify Windows runtime dependencies
+        run: node scripts/check-windows-runtime.mjs src-tauri/target/x86_64-pc-windows-msvc/release/jsonstudio.exe
+
       - name: Prepare artifacts
         shell: bash
         run: |

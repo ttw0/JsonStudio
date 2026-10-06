@@ -119,6 +119,10 @@ jobs:
             pnpm tauri build ${{ matrix.args }}
           fi
 
+      - name: Verify Windows runtime dependencies
+        if: matrix.platform == 'windows-latest'
+        run: node scripts/check-windows-runtime.mjs src-tauri/target/${{ matrix.target }}/release/jsonstudio.exe
+
       - name: Package macOS drag-and-drop DMG
         if: matrix.platform == 'macos-latest'
         shell: bash

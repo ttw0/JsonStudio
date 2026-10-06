@@ -3,3 +3,7 @@
 # and tests do not depend on a runtime download.
 TSLP_LANGUAGES = "javascript,typescript,java,kotlin,go,rust,python,swift,csharp,dart,php,ruby,scala,cpp,objc,proto,thrift"
 TSLP_LINK_MODE = "static"
+
+[target.'cfg(all(target_os = "windows", target_env = "msvc"))']
+# Include the MSVC runtime in the app, including native C/C++ dependencies.
+rustflags = ["-C", "target-feature=+crt-static"]
