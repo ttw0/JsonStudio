@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [1.5.1] - 2026-10-06
+
+### Added
+- **One-command installation**: add curl installation for macOS/Linux, PowerShell installation for Windows, and the cross-platform `@sundegan/jsonstudio` npm installer alongside Homebrew. Verify release checksums, track managed installations, and preserve user data when updating or uninstalling.
+
+### Improved
+- **Installation website and documentation**: align English and Chinese installation guidance, make command-selection tabs clearer, add JSONL to the feature comparison, and remove obsolete standalone guides.
+- **Release safeguards**: publish installer checksums with each release and check Windows executable imports in release, preview, and test builds to prevent distributing apps that require an unbundled Visual C++ runtime.
+
+### Fixed
+- **Windows startup after updating**: statically link the Visual C++ runtime so installation and updates no longer fail to launch with missing `VCRUNTIME140.dll` or `VCRUNTIME140_1.dll` errors introduced in v1.5.0.
+
 ## [1.5.0] - 2026-10-05
 
 ### Added

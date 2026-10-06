@@ -105,6 +105,35 @@
   <div class="changelog-container">
     <div class="timeline">
       
+      <!-- v1.5.1 -->
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+        <div class="timeline-header">
+          <span class="timeline-version">v1.5.1</span>
+          <span class="timeline-date">2026-10-06</span>
+        </div>
+        <div class="timeline-body">
+          <h3>新增</h3>
+          <ul>
+            <li><strong>一键安装</strong>：在 Homebrew 之外，新增 macOS/Linux 的 curl 安装、Windows 的 PowerShell 安装，以及跨平台的 <code>@sundegan/jsonstudio</code> npm 安装器。安装时验证发布包校验和、记录受管理的安装，并在更新或卸载时保留用户数据。</li>
+          </ul>
+          <h3>改进</h3>
+          <ul>
+            <li><strong>安装官网与文档</strong>：同步中英文安装说明，让命令选择标签更清晰，在功能对比中补充 JSONL，并移除过时的独立说明文档。</li>
+            <li><strong>发布保护</strong>：每个版本同时发布安装包校验和，并在正式版、预览版和测试构建中检查 Windows 程序依赖，避免再次发布需要额外 Visual C++ 运行库却未附带运行库的应用。</li>
+          </ul>
+          <h3>修复</h3>
+          <ul>
+            <li><strong>Windows 更新后无法启动</strong>：静态链接 Visual C++ 运行库，修复 v1.5.0 引入的安装或更新后因缺少 <code>VCRUNTIME140.dll</code>、<code>VCRUNTIME140_1.dll</code> 而无法启动的问题。</li>
+          </ul>
+          <a href="https://github.com/sundegan/JsonStudio/releases/tag/v1.5.1" target="_blank" class="release-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-right:8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            下载 v1.5.1
+          </a>
+        </div>
+      </div>
+
       <!-- v1.5.0 -->
       <div class="timeline-item">
         <div class="timeline-dot"></div>
