@@ -1,5 +1,8 @@
 import loader from '@monaco-editor/loader';
 import * as monaco from 'monaco-editor';
+import { get } from 'svelte/store';
+import { t } from '$lib/i18n';
+import { registerEmbeddedJsonCodeActions } from './embeddedJsonCodeActions.js';
 import { registerJsonFoldingProviders } from './json5Folding.js';
 
 let monacoInitPromise: Promise<typeof monaco> | null = null;
@@ -15,6 +18,7 @@ export function initMonaco(): Promise<typeof monaco> {
     loader.config({ monaco });
     monacoInitPromise = (loader.init() as Promise<typeof monaco>).then(instance => {
       registerJsonFoldingProviders(instance);
+      registerEmbeddedJsonCodeActions(instance, () => get(t)('editor.expandEmbeddedJson'));
       return instance;
     });
   }

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import type * as Monaco from 'monaco-editor';
   import { escapeString, minifyJson, unescapeString } from '$lib/services/json';
+  import { expandAllEmbeddedJson } from '$lib/services/embeddedJson.js';
   import { sortJsonKeys } from '$lib/services/jsonKeySort.js';
   import { convertToStandardJson } from '$lib/services/jsonToStandard.js';
   import { openFileDialog, saveFile as writeFile, saveFileDialog, saveBinaryFileDialog, getFileName } from '$lib/services/file';
@@ -469,6 +470,11 @@
     await handleConvertKeyNaming();
   }
 
+  async function handleExpandEmbeddedJsonFromMenu() {
+    showTransformMoreMenu = false;
+    await handleExpandEmbeddedJson();
+  }
+
   async function handleOpenFolder() {
     if (isSubPageMode) return;
     showOpenMenu = false;
@@ -684,6 +690,32 @@
     } catch (error) {
       console.error('Convert to standard JSON failed:', error);
       onToast($t('toolbar.convertToStandardFailed'), 'error');
+    } finally {
+      isProcessing = false;
+    }
+  }
+
+  async function handleExpandEmbeddedJson() {
+    if (!canUseJsonTools || isProcessing) return;
+    if (!hasJsonContent) {
+      onToast($t('toolbar.noContentProcess'), 'info');
+      return;
+    }
+
+    const operation = captureJsonOperationContext();
+    isProcessing = true;
+    try {
+      const result = expandAllEmbeddedJson(operation.content);
+      if (result.count === 0) {
+        onToast($t('toolbar.expandEmbeddedJsonNone'), 'info');
+        return;
+      }
+      if (!setJsonContentValue(result.content, operation)) return;
+      await onJsonStatsUpdate();
+      onToast($t('toolbar.expandEmbeddedJsonSuccess').replace('{count}', String(result.count)));
+    } catch (error) {
+      console.error('Expand embedded JSON failed:', error);
+      onToast($t('toolbar.expandEmbeddedJsonFailed'), 'error');
     } finally {
       isProcessing = false;
     }
@@ -1165,6 +1197,15 @@
                   <path d="M23 10v8"/>
                 </svg>
                 <span>{$t('toolbar.keyNamingLabel')}</span>
+              </button>
+              <button class="open-menu-item" onclick={handleExpandEmbeddedJsonFromMenu} disabled={isProcessing || !canUseJsonTools} use:tooltip={$t('toolbar.expandEmbeddedJsonTooltip')}>
+                <svg class="toolbar-icon" style="color: #0ea5e9;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 4H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/>
+                  <path d="M16 4h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/>
+                  <path d="M12 8v8"/>
+                  <path d="M9 13l3 3 3-3"/>
+                </svg>
+                <span>{$t('toolbar.expandEmbeddedJsonLabel')}</span>
               </button>
             </div>
           {/if}

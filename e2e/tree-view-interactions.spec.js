@@ -242,3 +242,88 @@ test('dragging a Tree node reorders the JSON document', async ({ page }) => {
     return editor.getModel().getValueInRange(editor.getSelection());
   })).toContain('"first": "one"');
 });
+
+test('expands a JSON string value into a nested object', async ({ page }) => {
+  const content = `{
+  "event": {
+    "payload": "{\\"id\\":7,\\"tags\\":[\\"a\\",\\"b\\"]}",
+    "note": "plain"
+  }
+}`;
+  await openTreeDocument(page, content);
+
+  const payloadRow = treeRow(page, '/event/payload');
+  await payloadRow.hover();
+  await expect(treeRow(page, '/event/note').getByTestId('tree-expand-embedded-json')).toHaveCount(0);
+  await payloadRow.getByTestId('tree-expand-embedded-json').click();
+
+  await expect(treeRow(page, '/event/payload/id')).toBeVisible();
+  await expect(treeRow(page, '/event/payload/tags')).toBeVisible();
+  const editorValue = await page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    const monaco = await initMonaco();
+    return monaco.editor.getModels().find((model) => model.getValue().includes('"event"'))?.getValue();
+  });
+  expect(editorValue).toBe(`{
+  "event": {
+    "payload": {
+      "id": 7,
+      "tags": [
+        "a",
+        "b"
+      ]
+    },
+    "note": "plain"
+  }
+}`);
+});
+
+const EMBEDDED_JSON_DOCUMENT = `{
+  "a": ${JSON.stringify(JSON.stringify({ inner: JSON.stringify({ level: 2 }) }))},
+  "b": "text"
+}`;
+
+async function readEditorValue(page) {
+  return page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    return (await initMonaco()).editor.getEditors()[0].getValue();
+  });
+}
+
+test('toolbar menu expands every JSON string in the document', async ({ page }) => {
+  await openTreeDocument(page, EMBEDDED_JSON_DOCUMENT);
+
+  await page.locator('.toolbar-transform-more-wrap .toolbar-icon-btn').click();
+  await page.getByRole('button', { name: 'Expand JSON strings' }).click();
+
+  await expect(page.getByText('Expanded 2 JSON string(s)')).toBeVisible();
+  await expect.poll(() => readEditorValue(page)).toBe(`{
+  "a": {
+    "inner": {
+      "level": 2
+    }
+  },
+  "b": "text"
+}`);
+});
+
+test('editor quick action expands the JSON string under the cursor', async ({ page }) => {
+  await openTreeDocument(page, EMBEDDED_JSON_DOCUMENT);
+
+  await page.evaluate(async () => {
+    const { initMonaco } = await import('/src/lib/services/monaco.ts');
+    const editor = (await initMonaco()).editor.getEditors()[0];
+    editor.setPosition({ lineNumber: 2, column: 12 });
+    editor.focus();
+  });
+  await page.locator('.monaco-editor .lightBulbWidget').click();
+  await expect(page.getByText('Expand JSON string into object/array')).toBeVisible();
+  await page.keyboard.press('Enter');
+
+  await expect.poll(() => readEditorValue(page)).toBe(`{
+  "a": {
+    "inner": "{\\"level\\":2}"
+  },
+  "b": "text"
+}`);
+});

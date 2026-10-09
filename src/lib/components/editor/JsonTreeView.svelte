@@ -7,6 +7,7 @@
   import { findJsonTreeNodeAtOffset } from '$lib/services/jsonTreeModel.js';
   import { getCachedJsonTreeModel, getJsonTreeModelAsync } from '$lib/services/jsonTreeModelCache.js';
   import { createTreeDragMove, createTreeKeyEdit, createTreePathCopyText, createTreeValueCopyText, getTreeNodeSelectionRange, isTreeKeyEditable as isEditableTreeKey } from '$lib/services/treeEdit.js';
+  import { createEmbeddedJsonExpandEdit, parseEmbeddedJsonString } from '$lib/services/embeddedJson.js';
   import { runTreeQuery, type QueryMode } from '$lib/services/treeQuery';
   import ConfirmDialog from '../dialogs/ConfirmDialog.svelte';
   import type MonacoEditor from './MonacoEditor.svelte';
@@ -129,6 +130,7 @@
   let dragPosition = $state<TreeDropPosition | null>(null);
   let pendingMovedPath = $state<string | null>(null);
   let pendingEditKeyPath = $state<string | null>(null);
+  let pendingExpandedPath: string | null = null;
   let pointerDragStart = $state<{ path: string; x: number; y: number } | null>(null);
   let isPointerDragging = $state(false);
   let suppressNextTreeClick = $state(false);
@@ -164,6 +166,7 @@
       if (tabId !== previousTabId) {
         pendingMovedPath = null;
         pendingEditKeyPath = null;
+        pendingExpandedPath = null;
       }
       previousContent = content;
       previousTabId = tabId;
@@ -230,6 +233,7 @@
       treeNodeByPath = new Map();
       pendingMovedPath = null;
       pendingEditKeyPath = null;
+      pendingExpandedPath = null;
       treeError = '';
       rootData = null;
       parsedPointers = {};
@@ -266,6 +270,7 @@
       treeNodeByPath = new Map();
       pendingMovedPath = null;
       pendingEditKeyPath = null;
+      pendingExpandedPath = null;
       rootData = null;
       parsedPointers = {};
       hasDuplicateSourceKeys = false;
@@ -313,6 +318,10 @@
       getAncestorPaths(pendingMovedPath).forEach((path) => nextExpanded.add(path));
       selectedPath = pendingMovedPath;
       pendingMovedPath = null;
+    }
+    if (pendingExpandedPath) {
+      if (treeNodeByPath.has(pendingExpandedPath)) nextExpanded.add(pendingExpandedPath);
+      pendingExpandedPath = null;
     }
     if (pendingEditKeyPath) {
       treeEdit = createTreeKeyEditState(pendingEditKeyPath);
@@ -1033,6 +1042,32 @@
     } catch (e) {}
   }
 
+  const embeddedJsonCache = new WeakMap<TreeNode, boolean>();
+
+  function hasEmbeddedJson(node: TreeNode): boolean {
+    if (node.type !== 'string') return false;
+    let cached = embeddedJsonCache.get(node);
+    if (cached === undefined) {
+      cached = parseEmbeddedJsonString(node.value).ok;
+      embeddedJsonCache.set(node, cached);
+    }
+    return cached;
+  }
+
+  function expandEmbeddedJson(node: TreeNode) {
+    if (hasDuplicateSourceKeys) {
+      showDuplicateKeysReadOnly();
+      return;
+    }
+    const result = createEmbeddedJsonExpandEdit(content, node);
+    if (!result.ok || !result.edit) return;
+
+    selectedPath = node.path;
+    pendingExpandedPath = node.path;
+    editor?.replaceRangeByOffsets(result.edit.start, result.edit.end, result.edit.text);
+    dispatch('toast', { message: $t('treeView.embeddedJsonExpanded') });
+  }
+
   async function copyPath(node: TreeNode) {
     const pathText = createTreePathCopyText(rootData, node.path);
 
@@ -1546,6 +1581,23 @@
             </div>
 
             <div class="tree-node-actions" class:tree-node-actions-visible={isHovered}>
+              {#if hasEmbeddedJson(node)}
+                <button
+                  class="tree-copy-btn"
+                  onclick={(e) => { e.stopPropagation(); expandEmbeddedJson(node); }}
+                  aria-label={$t('treeView.expandEmbeddedJson')}
+                  data-tooltip={$t('treeView.expandEmbeddedJson')}
+                  data-testid="tree-expand-embedded-json"
+                  type="button"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 4H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"></path>
+                    <path d="M16 4h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"></path>
+                    <path d="M12 8v8"></path>
+                    <path d="M9 13l3 3 3-3"></path>
+                  </svg>
+                </button>
+              {/if}
               <!-- Copy Path Button -->
               <button
                 class="tree-copy-btn"
